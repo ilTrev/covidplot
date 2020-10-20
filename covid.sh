@@ -141,9 +141,9 @@ EOF
 echo "<h3><center>Situazione COVID-19 in Italia al" >>$HTMLFILE
 echo "<!-- data -->" $(date +"%d-%m-%Y - %H:%M") >>$HTMLFILE
 echo "<br><i>(dati del $DATAULTIMO)</i></center></h3>" >>$HTMLFILE
-echo "<br>Nuovi tamponi: <b>$TAMPONIOGGI</b> (precedente: $TAMPONIIERI) Record: $RECORDTAMPONI" >>$HTMLFILE
-echo "<br>Nuovi casi:    <b>$CASIOGGI - $RAPPORTOCASITAMPONIOGGI%</b> (precedente: $CASIIERI - $RAPPORTOCASITAMPONIIERI%) Record: $RECORDCASI" >>$HTMLFILE
-echo "<br>Nuovi decessi: <b>$DECESSIOGGI</b> (precedente: $DECESSIIERI) Record: $RECORDDECESSI" >>$HTMLFILE
+echo "<br>Nuovi tamponi: <b>$TAMPONIOGGI</b> (precedente: $TAMPONIIERI) Max registrato: $RECORDTAMPONI" >>$HTMLFILE
+echo "<br>Nuovi casi:    <b>$CASIOGGI $RAPPORTOCASITAMPONIOGGI%</b> (precedente: $CASIIERI $RAPPORTOCASITAMPONIIERI%) Max registrato: $RECORDCASI" >>$HTMLFILE
+echo "<br>Nuovi decessi: <b>$DECESSIOGGI</b> (precedente: $DECESSIIERI) Max registrato: $RECORDDECESSI" >>$HTMLFILE
 echo "<br>Ricoverati:    <b>$RICOVERATI</b> (precedente: $RICOVERATIIERI) Terapie intensive: $TERAPIEINTENSIVE (precedente: $TERAPIEINTENSIVEIERI)" >>$HTMLFILE
 
 cat <<EOF >> $HTMLFILE
@@ -156,5 +156,5 @@ EOF
 curl -T $HTMLFILE -u $CREDENTIALS "ftp://iltrev.it/"
 
 
-curl -X POST -H 'Content-Type: application/json' -d "{ \"chat_id\": \"@iltrevcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI - $RAPPORTOCASITAMPONIOGGI\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
+curl -X POST -H 'Content-Type: application/json' -d "{ \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
 echo "End..: $(date)" >>$LOGFILE
