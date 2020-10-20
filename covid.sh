@@ -1,16 +1,18 @@
 #!/bin/sh
 
-export LATESTFILE=/tmp/covidLatest.csv
-export OLDLATESTFILE=/tmp/covidoldLatest.csv
-export JSONFILE=/tmp/covid.json
-export OLDJSONFILE=/tmp/covidold.json
-export TMPCSVFILE=/tmp/covidtmp.csv
-export CSVFILE=/tmp/covid.csv
-export IMGFILE=/tmp/covid.svg
-export HTMLFILE=/tmp/index.html
-export HTMLFILETMP=/tmp/indextmp.html
-export LOGFILE=/share/Public/bin/covid/covid.log
-export CREDENTIALS="covid@iltrev.it:IlCovid765"
+LATESTFILE=/tmp/covidLatest.csv
+OLDLATESTFILE=/tmp/covidoldLatest.csv
+JSONFILE=/tmp/covid.json
+OLDJSONFILE=/tmp/covidold.json
+TMPCSVFILE=/tmp/covidtmp.csv
+CSVFILE=/tmp/covid.csv
+IMGFILE=/tmp/covid.svg
+HTMLFILE=/tmp/index.html
+HTMLFILETMP=/tmp/indextmp.html
+MYPATH="/share/Public/bin/covid"
+LOGFILE=$MYPATH/covid.log
+CREDENTIALS=$(cat $MYPATH/ftpcredentials.credential)
+TELEGRAM_BOT_TOKEN=$(cat $MYPATH/telegramtoken.credential)
 
 echo "Start: $(date)" >>$LOGFILE
 
@@ -152,4 +154,7 @@ Elaborazione dati forniti dal Dipartimento della Protezione Civile (fonte: <a hr
 EOF
 
 curl -T $HTMLFILE -u $CREDENTIALS "ftp://iltrev.it/"
+
+
+curl -X POST -H 'Content-Type: application/json' -d "{ \"chat_id\": \"@iltrevcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI - $RAPPORTOCASITAMPONIOGGI\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
 echo "End..: $(date)" >>$LOGFILE
