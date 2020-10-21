@@ -14,6 +14,29 @@ CREDENTIALS=$(cat $MYPATH/ftpcredentials.credential)
 TELEGRAM_BOT_TOKEN=$(cat $MYPATH/telegramtoken.credential)
 FORCED=""
 REGIONE=""
+REGIONI=( \
+	"Abruzzo" \
+	"Basilicata" \
+	"Calabria" \
+	"Campania" \
+	"Emilia-Romagna" \
+	"Friuli Venezia Giulia" \
+	"Lazio" \
+	"Liguria" \
+	"Lombardia" \
+	"Marche" \
+	"Molise" \
+	"P.A. Bolzano" \
+	"P.A. Trento" \
+	"Piemonte" \
+	"Puglia" \
+	"Sardegna" \
+	"Sicilia" \
+	"Toscana" \
+	"Umbria" \
+	"Valle d'Aosta" \
+	"Veneto" \
+)
 
 if [ "$1" = "-f" ]; then
 	FORCED="(forced)"
@@ -187,7 +210,25 @@ cat <<EOF >>"$HTMLFILE"
 <link rel="shortcut icon" type="image/png" href="https://www.iltrev.it/covid/favicon.png"/>
 </head>
 <body>
+<label for="Regioni">Seleziona regione:</label>
+<select name="forma" onchange="location = this.value;">
 EOF
+
+echo "<option value=\"https://www.iltrev.it/covid\">ITALIA</option>" >>$HTMLFILE
+
+for REG in "${REGIONI[@]}"; do
+	REGFORMAT=$(echo "$REG" | sed "s/[^[:alnum:]]//g")
+	if [ "$REGFORMAT" = "$REGIONEFORMAT" ]; then
+		SELECTED="selected=\"selected\""
+	else
+		SELECTED=""
+	fi
+	echo "<option $SELECTED value=\"https://www.iltrev.it/covid/$REGFORMAT\">$REG</option>" >>$HTMLFILE
+done
+
+
+echo "</select>" >>"$HTMLFILE"
+
 
 echo "<h3><center>Situazione COVID-19 - $REGIONEWEB<br>" >>"$HTMLFILE"
 echo "<!-- data -->" $(date +"%d-%m-%Y - %H:%M") >>"$HTMLFILE"
@@ -216,28 +257,11 @@ fi
 
 curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
+# esecuzione di tutto il procedimento tra tutte le regioni
 if [ -z "$REGIONE" ]; then
-	$MYPATH/covid.sh "Abruzzo"
-	$MYPATH/covid.sh "Basilicata"
-	$MYPATH/covid.sh "Calabria"
-	$MYPATH/covid.sh "Campania"
-	$MYPATH/covid.sh "Emilia-Romagna"
-	$MYPATH/covid.sh "Friuli Venezia Giulia"
-	$MYPATH/covid.sh "Lazio"
-	$MYPATH/covid.sh "Liguria"
-	$MYPATH/covid.sh "Lombardia"
-	$MYPATH/covid.sh "Marche"
-	$MYPATH/covid.sh "Molise"
-	$MYPATH/covid.sh "P.A. Bolzano"
-	$MYPATH/covid.sh "P.A. Trento"
-	$MYPATH/covid.sh "Piemonte"
-	$MYPATH/covid.sh "Puglia"
-	$MYPATH/covid.sh "Sardegna"
-	$MYPATH/covid.sh "Sicilia"
-	$MYPATH/covid.sh "Toscana"
-	$MYPATH/covid.sh "Umbria"
-	$MYPATH/covid.sh "Valle d'Aosta"
-	$MYPATH/covid.sh "Veneto"
+	for REG in "${REGIONI[@]}"; do
+		$MYPATH/covid.sh "$REG"
+	done
 fi
 
 if [ -z "$FORCED" ]; then

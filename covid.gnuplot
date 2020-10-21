@@ -31,8 +31,6 @@ set ylabel "Totale deceduti"
 set y2label "Deceduti giorno"
 plot "/tmp/covid.csv" using 1:11 with lines, "/tmp/covid.csv" using 1:20 with lines axis x1y2
 
-unset y2tics
-
 set title "Ricoverati"
 set ylabel "Ricoverati / terapie intensive"
 set y2label "Dimessi / guariti"
