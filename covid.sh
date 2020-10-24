@@ -1,9 +1,7 @@
 #!/bin/sh
 
 LATESTFILE=/tmp/covidLatest.csv
-OLDLATESTFILE=/tmp/covidoldLatest.csv
-JSONFILE=/tmp/covid.json
-OLDJSONFILE=/tmp/covidold.json
+LATESTDONEFILE=/tmp/covidLatestDone.txt
 TMPCSVFILE=/tmp/covidtmp.csv
 CSVFILE=/tmp/covid.csv
 HTMLFILE=/tmp/index.html
@@ -38,6 +36,11 @@ REGIONI=( \
 	"Veneto" \
 )
 
+if [ $(cat "$MYPATH/covid.log" | wc -l) -gt 1000 ]; then 
+	tail -1000 "$MYPATH/covid.log" >/tmp/covid.log
+	mv /tmp/covid.log "$MYPATH/covid.log"
+fi
+
 if [ "$1" = "-f" ]; then
 	FORCED="(forced)"
 else
@@ -49,6 +52,7 @@ else
 
 		HTMLFILE="/tmp/$REGIONEFORMAT/index.html"
 		TMPREGIONIFILE="/tmp/$REGIONEFORMAT/covidLatest.tmp"
+		INDENT=" - "
 
 		echo "$REGIONE"
 
@@ -60,21 +64,28 @@ fi
 
 IMGFILE="/tmp/covid$REGIONEFORMAT.svg"
 
-echo "Start: $(date) $FORCED" >>"$LOGFILE"
-
-mv "$LATESTFILE" "$OLDLATESTFILE"
+echo "$INDENT""Start: $(date) $FORCED" >>"$LOGFILE"
 
 curl https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv >"$LATESTFILE" 2>/dev/null
 
-diff "$LATESTFILE" "$OLDLATESTFILE"
-if [ $? -eq 0 ] && [ -z "$FORCED" ]; then
-	DATAOGGI=$(date +"%d-%m-%Y - %H:%M")
-	cat "$HTMLFILE" | sed "s/<!-- data -->.*/<!-- data --> $DATAOGGI/g" >>"$HTMLFILETMP"
-	mv "$HTMLFILETMP" "$HTMLFILE"
-	curl -T "$HTMLFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
-	echo "End (noop): $(date)" >>"$LOGFILE"
-	exit
+TODAY=$(date +"%Y-%m"-%d)
+LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
+LATESTDONE=$(cat "$LATESTDONEFILE")
+
+if [ "$LATESTDONE" != "$LATESTDOWNLOAD" ] && [ "$TODAY" = "$LATESTDOWNLOAD" ]; then
+	echo "Update found!" >>"$LOGFILE"
+else
+	if [ -z "$FORCED" ]; then
+		DATAOGGI=$(date +"%d-%m-%Y - %H:%M")
+		cat "$HTMLFILE" | sed "s/<!-- data -->.*/<!-- data --> $DATAOGGI/g" >>"$HTMLFILETMP"
+		mv "$HTMLFILETMP" "$HTMLFILE"
+		curl -T "$HTMLFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+		echo "$INDENT""End (NoOp): $(date)" >>"$LOGFILE"
+		exit
+	fi
 fi
+
+echo "$LATESTDOWNLOAD" > "$LATESTDONEFILE"
 
 if [ ! -z "$REGIONE" ]; then
 	curl https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
@@ -93,7 +104,7 @@ export RECORDDECESSI=0
 
 cat "$TMPCSVFILE" | while read LINE; do
 	if [ $COUNT -eq 0 ]; then
-		echo "$LINE,\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\"" | sed "s/_/ /g" >"$CSVFILE"
+		echo "$LINE,\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\"" | sed "s/_/ /g" >"$CSVFILE"
 		((COUNT+=1))
 		continue
 	fi
@@ -103,6 +114,23 @@ cat "$TMPCSVFILE" | while read LINE; do
 	TAMPONITOTALI=$(echo "$LINE" | cut -f15 -d",")
 	TAMPONIIERI=$TAMPONIOGGI
 	TAMPONIOGGI=$(echo "$TAMPONITOTALI $TAMPONITOTALIIERI - p" | dc)
+
+	CASISETTEGIORNI=("${CASISETTEGIORNI[@]}" "$CASI")
+	if [ "${#CASISETTEGIORNI[@]}" -gt 7 ]; then
+		CASISETTEGIORNI=("${CASISETTEGIORNI[@]:1}")
+		let MEDIACASI=$(IFS=+; echo "$((${CASISETTEGIORNI[*]}))")/7
+	else
+		MEDIACASI=0
+	fi
+
+	VARIAZIONE=$(echo "$LINE" | cut -f8 -d",")
+	VARIAZIONISETTEGIORNI=("${VARIAZIONISETTEGIORNI[@]}" "$VARIAZIONE")
+	if [ "${#VARIAZIONISETTEGIORNI[@]}" -gt 7 ]; then
+		VARIAZIONISETTEGIORNI=("${VARIAZIONISETTEGIORNI[@]:1}")
+		let MEDIAVARIAZIONI=$(IFS=+; echo "$((${VARIAZIONISETTEGIORNI[*]}))")/7
+	else
+		MEDIAVARIAZIONI=0
+	fi
 	
 	if [ "$TAMPONIOGGI" -le "0" ] ; then
 		TAMPONIOGGI=0
@@ -121,6 +149,18 @@ cat "$TMPCSVFILE" | while read LINE; do
 	DECESSITOTALI=$(echo "$LINE" | cut -f11 -d",")
 	DECESSIOGGI=$(echo "$DECESSITOTALI $DECESSITOTALIIERI - p" | dc)
 
+	if [ "$DECESSIOGGI" -le "0" ] ; then
+		DECESSIOGGI=0
+	fi
+
+	DECESSISETTEGIORNI=("${DECESSISETTEGIORNI[@]}" "$DECESSIOGGI")
+	if [ "${#DECESSISETTEGIORNI[@]}" -gt 7 ]; then
+		DECESSISETTEGIORNI=("${DECESSISETTEGIORNI[@]:1}")
+		let MEDIADECESSI=$(IFS=+; echo "$((${DECESSISETTEGIORNI[*]}))")/7
+	else
+		MEDIADECESSI=0
+	fi
+
 	if [ $CASI -gt $RECORDCASI ]; then
 		RECORDCASI=$CASI
 	fi
@@ -133,7 +173,7 @@ cat "$TMPCSVFILE" | while read LINE; do
 		RECORDDECESSI=$DECESSIOGGI
 	fi
 
-	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI" >>"$CSVFILE"
+	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI,$MEDIAVARIAZIONI,$MEDIADECESSI" >>"$CSVFILE"
 
 	DECESSITOTALIIERI=$DECESSITOTALI
 
@@ -214,7 +254,7 @@ cat <<EOF >>"$HTMLFILE"
 <select name="forma" onchange="location = this.value;">
 EOF
 
-echo "<option value=\"https://www.iltrev.it/covid\">ITALIA</option>" >>$HTMLFILE
+echo "<option value=\"https://www.iltrev.it/covid\">ITALIA</option>" >>"$HTMLFILE"
 
 for REG in "${REGIONI[@]}"; do
 	REGFORMAT=$(echo "$REG" | sed "s/[^[:alnum:]]//g")
@@ -223,28 +263,29 @@ for REG in "${REGIONI[@]}"; do
 	else
 		SELECTED=""
 	fi
-	echo "<option $SELECTED value=\"https://www.iltrev.it/covid/$REGFORMAT\">$REG</option>" >>$HTMLFILE
+	echo "<option $SELECTED value=\"https://www.iltrev.it/covid/$REGFORMAT\">$REG</option>" >>"$HTMLFILE"
 done
 
-
 echo "</select>" >>"$HTMLFILE"
+echo "<br>Iscriviti al <a href=\"https://t.me/instantcovid\" target="_blank">Canale Telegram</a>" >>"$HTMLFILE"
 
 
 echo "<h3><center>Situazione COVID-19 - $REGIONEWEB<br>" >>"$HTMLFILE"
 echo "<!-- data -->" $(date +"%d-%m-%Y - %H:%M") >>"$HTMLFILE"
 echo "<br><i>(dati del $DATAULTIMO)</i></center></h3>" >>"$HTMLFILE"
-echo "<br><pre>Nuovi tamponi: <b>$TAMPONIOGGI</b> (precedente: $TAMPONIIERI)" >>$HTMLFILE
+echo "<br><pre>Nuovi tamponi: <b>$TAMPONIOGGI</b> (precedente: $TAMPONIIERI)" >>"$HTMLFILE"
 echo "          Max: $RECORDTAMPONI" >>"$HTMLFILE"
-echo "   Nuovi casi: <b>$CASIOGGI $RAPPORTOCASITAMPONIOGGI%</b> (precedente: $CASIIERI $RAPPORTOCASITAMPONIIERI%)" >>$HTMLFILE
+echo "   Nuovi casi: <b>$CASIOGGI $RAPPORTOCASITAMPONIOGGI%</b> (precedente: $CASIIERI $RAPPORTOCASITAMPONIIERI%)" >>"$HTMLFILE"
 echo "          Max: $RECORDCASI" >>"$HTMLFILE"
-echo "Nuovi decessi: <b>$DECESSIOGGI</b> (precedente: $DECESSIIERI)" >>$HTMLFILE
+echo "Nuovi decessi: <b>$DECESSIOGGI</b> (precedente: $DECESSIIERI)" >>"$HTMLFILE"
 echo "          Max: $RECORDDECESSI" >>"$HTMLFILE"
 echo "   Ricoverati: <b>$RICOVERATI</b> (precedente: $RICOVERATIIERI)" >>"$HTMLFILE"
 echo " Terapie int.: <b>$TERAPIEINTENSIVE</b> (precedente: $TERAPIEINTENSIVEIERI)</pre>" >>"$HTMLFILE"
 echo "<p><img src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
 
 cat <<EOF >> $HTMLFILE
-Elaborazione dati forniti dal Dipartimento della Protezione Civile (fonte: <a href="https://github.com/pcm-dpc/COVID-19">https://github.com/pcm-dpc/COVID-19</a>)
+Elaborazione dati forniti dal Dipartimento della Protezione Civile 
+<br>(fonte: <a href="https://github.com/pcm-dpc/COVID-19" target="_blank">https://github.com/pcm-dpc/COVID-19</a>)
 </body>
 </html> 
 EOF
@@ -257,6 +298,13 @@ fi
 
 curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
+if [ -z "$FORCED" ]; then
+	echo "Started Telegram post: $(date)" >>"$LOGFILE"
+	curl -X POST -H 'Content-Type: application/json' -d "{ \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
+fi
+
+
 # esecuzione di tutto il procedimento tra tutte le regioni
 if [ -z "$REGIONE" ]; then
 	for REG in "${REGIONI[@]}"; do
@@ -264,9 +312,4 @@ if [ -z "$REGIONE" ]; then
 	done
 fi
 
-if [ -z "$FORCED" ]; then
-	echo "Telegram"
-	curl -X POST -H 'Content-Type: application/json' -d "{ \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
-fi
-
-echo "End..: $(date)" >>"$LOGFILE"
+echo "$INDENT""End..: $(date)" >>"$LOGFILE"
