@@ -18,7 +18,7 @@ set y2tics
 set title "Tamponi"
 set ylabel "Tamponi giorno"
 set y2label "Positivi/Tamponi"
-plot "/tmp/covid.csv" using 1:19 with lines, \
+plot "/share/Public/bin/covid/out/covid.csv" using 1:19 with lines, \
      "" using 1:18 with lines  axis x1y2
 
 set title "Casi positivi"
