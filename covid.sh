@@ -1,13 +1,14 @@
 #!/bin/sh
 
-LATESTFILE=/tmp/covidLatest.csv
-LATESTDONEFILE=/tmp/covidLatestDone.txt
-TMPCSVFILE=/tmp/covidtmp.csv
-CSVFILE=/tmp/covid.csv
-HTMLFILE=/tmp/index.html
-HTMLFILETMP=/tmp/indextmp.html
 MYPATH="/share/Public/bin/covid"
-LOGFILE=$MYPATH/covid.log
+OUTPATH="$MYPATH/out"
+LATESTFILE="$OUTPATH/covidLatest.csv"
+LATESTDONEFILE="$OUTPATH/covidLatestDone.txt"
+TMPCSVFILE="$OUTPATH/covidtmp.csv"
+CSVFILE="$OUTPATH/covid.csv"
+HTMLFILE="$OUTPATH/index.html"
+HTMLFILETMP="$OUTPATH/indextmp.html"
+LOGFILE="$OUTPATH/covid.log"
 CREDENTIALS=$(cat $MYPATH/ftpcredentials.credential)
 TELEGRAM_BOT_TOKEN=$(cat $MYPATH/telegramtoken.credential)
 FORCED=""
@@ -36,9 +37,9 @@ REGIONI=( \
 	"Veneto" \
 )
 
-if [ $(cat "$MYPATH/covid.log" | wc -l) -gt 1000 ]; then 
-	tail -1000 "$MYPATH/covid.log" >/tmp/covid.log
-	mv /tmp/covid.log "$MYPATH/covid.log"
+if [ $(cat "$LOGFILE" | wc -l) -gt 1000 ]; then 
+	tail -1000 "$LOGFILE" >/tmp/covid.log
+	mv /tmp/covid.log "$LOGFILE"
 fi
 
 if [ "$1" = "-f" ]; then
@@ -50,19 +51,19 @@ else
 
 		REGIONEFORMAT=$(echo "$REGIONE" | sed "s/[^[:alnum:]]//g")
 
-		HTMLFILE="/tmp/$REGIONEFORMAT/index.html"
-		TMPREGIONIFILE="/tmp/$REGIONEFORMAT/covidLatest.tmp"
+		HTMLFILE="$OUTPATH/$REGIONEFORMAT/index.html"
+		TMPREGIONIFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 		INDENT=" - "
 
 		echo "$REGIONE"
 
-		if [ ! -d "/tmp/$REGIONEFORMAT" ]; then 
-			mkdir /tmp/"$REGIONEFORMAT"
+		if [ ! -d "$OUTPATH/$REGIONEFORMAT" ]; then 
+			mkdir "$OUTPATH/$REGIONEFORMAT"
 		fi
 	fi
 fi
 
-IMGFILE="/tmp/covid$REGIONEFORMAT.svg"
+IMGFILE="$OUTPATH/covid$REGIONEFORMAT.svg"
 
 echo "$INDENT""Start: $(date) $FORCED" >>"$LOGFILE"
 
@@ -214,7 +215,7 @@ RECORDTAMPONI=$(echo $DATIOGGI | cut -f21 -d",")
 RECORDCASI=$(echo $DATIOGGI | cut -f22 -d",")
 RECORDDECESSI=$(echo $DATIOGGI | cut -f23 -d",")
 
-gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE"
+/opt/bin/gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 curl -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 
 if [ ! -z "$REGIONE" ]; then
