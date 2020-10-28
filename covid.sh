@@ -54,8 +54,9 @@ else
 		HTMLFILE="$OUTPATH/$REGIONEFORMAT/index.html"
 		TMPREGIONIFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 		INDENT=" - "
-
-		echo "$REGIONE"
+		POPOLAZIONE=$(cat "$MYPATH/regioni.txt"| grep "$REGIONE" | cut -f2 -d",")
+		
+		echo "$REGIONE - pop.: $POPOLAZIONE"
 
 		if [ ! -d "$OUTPATH/$REGIONEFORMAT" ]; then 
 			mkdir "$OUTPATH/$REGIONEFORMAT"
@@ -63,15 +64,28 @@ else
 	fi
 fi
 
+if [ -z "$REGIONE" ]; then
+	POPOLAZIONE=$(cat $MYPATH/regioni.txt | grep "Italia" | cut -f2 -d",") 
+	echo "ITALIA - pop. $POPOLAZIONE"	
+fi
+
 IMGFILE="$OUTPATH/covid$REGIONEFORMAT.svg"
 
-echo "$INDENT""Start: $(date) $FORCED" >>"$LOGFILE"
+echo "$INDENT""Start.....: $(date) $FORCED" >>"$LOGFILE"
 
-curl https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv >"$LATESTFILE" 2>/dev/null
-
-TODAY=$(date +"%Y-%m"-%d)
-LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
 LATESTDONE=$(cat "$LATESTDONEFILE")
+TODAY=$(date +"%Y-%m"-%d)
+
+if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
+	echo "$INDENT""Already Updated" >>"$LOGFILE"
+	echo "$INDENT""End (NoOp): $(date)" >>"$LOGFILE"
+	exit
+fi
+
+
+curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv >"$LATESTFILE" 2>/dev/null
+
+LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
 
 if [ "$LATESTDONE" != "$LATESTDOWNLOAD" ] && [ "$TODAY" = "$LATESTDOWNLOAD" ]; then
 	echo "Update found!" >>"$LOGFILE"
@@ -89,11 +103,11 @@ fi
 echo "$LATESTDOWNLOAD" > "$LATESTDONEFILE"
 
 if [ ! -z "$REGIONE" ]; then
-	curl https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
 	head -1 "$TMPREGIONIFILE" | cut -f1,2,7- -d"," >"$TMPCSVFILE"
 	cat "$TMPREGIONIFILE" | grep ",$REGIONE," | cut -f1,2,7- -d"," >>"$TMPCSVFILE"
 else
-	curl https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv >"$TMPCSVFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv >"$TMPCSVFILE" 2>/dev/null
 fi
 
 export TAMPONITOTALIIERI=0
@@ -215,6 +229,10 @@ RECORDTAMPONI=$(echo $DATIOGGI | cut -f21 -d",")
 RECORDCASI=$(echo $DATIOGGI | cut -f22 -d",")
 RECORDDECESSI=$(echo $DATIOGGI | cut -f23 -d",")
 
+TOTALEPOSITIVI=$(echo $DATIOGGI | cut -f7 -d",")
+PERCPOSITIVI=$(echo "$TOTALEPOSITIVI $POPOLAZIONE / 100 * p" | dc)
+echo "positivi: $TOTALEPOSITIVI - %positivi $PERCPOSITIVI"
+
 /opt/bin/gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 curl -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 
@@ -281,7 +299,8 @@ echo "          Max: $RECORDCASI" >>"$HTMLFILE"
 echo "Nuovi decessi: <b>$DECESSIOGGI</b> (precedente: $DECESSIIERI)" >>"$HTMLFILE"
 echo "          Max: $RECORDDECESSI" >>"$HTMLFILE"
 echo "   Ricoverati: <b>$RICOVERATI</b> (precedente: $RICOVERATIIERI)" >>"$HTMLFILE"
-echo " Terapie int.: <b>$TERAPIEINTENSIVE</b> (precedente: $TERAPIEINTENSIVEIERI)</pre>" >>"$HTMLFILE"
+echo " Terapie int.: <b>$TERAPIEINTENSIVE</b> (precedente: $TERAPIEINTENSIVEIERI)" >>"$HTMLFILE"
+echo "   % positivi: <b>$(printf "%.3f" $PERCPOSITIVI)</b> ($TOTALEPOSITIVI su $POPOLAZIONE abitanti)</pre>" >>"$HTMLFILE"
 echo "<p><img src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
 
 cat <<EOF >> $HTMLFILE
@@ -313,4 +332,4 @@ if [ -z "$REGIONE" ]; then
 	done
 fi
 
-echo "$INDENT""End..: $(date)" >>"$LOGFILE"
+echo "$INDENT""End.......: $(date)" >>"$LOGFILE"
