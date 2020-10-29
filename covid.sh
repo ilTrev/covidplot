@@ -8,6 +8,7 @@ LATESTDONEFILE="$OUTPATH/covidLatestDone.txt"
 TMPSINGOLAREGIONEFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 TMPCSVFILE="$OUTPATH/covidtmp.csv"
 CSVFILE="$OUTPATH/covid.csv"
+PROVINCECSVFILE="$OUTPATH/covidProvince.csv"
 HTMLFILE="$OUTPATH/index.html"
 HTMLFILETMP="$OUTPATH/indextmp.html"
 LOGFILE="$OUTPATH/covid.log"
@@ -58,6 +59,7 @@ else
 		POPOLAZIONE=$(cat "$MYPATH/regioni.txt"| grep "$REGIONE" | cut -f2 -d",")
 		
 		TMPREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covid"$REGIONEFORMAT"tmp.csv"
+		PROVINCEREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covidProvince.csv"
 		CSVFILE="$OUTPATH/$REGIONEFORMAT/covid.csv"
 
 		echo "$REGIONE - pop.: $POPOLAZIONE"
@@ -112,9 +114,11 @@ echo "$LATESTDOWNLOAD" > "$LATESTDONEFILE"
 if [ -z "$REGIONE" ]; then
 	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv >"$TMPCSVFILE" 2>/dev/null
 	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-province/dpc-covid19-ita-province-latest.csv >"$PROVINCECSVFILE" 2>/dev/null
 else
 	head -1 "$TMPREGIONIFILE" | cut -f1,2,7- -d"," >"$TMPREGIONECSVFILE"
 	cat "$TMPREGIONIFILE" | grep ",$REGIONE," | cut -f1,2,7- -d"," >>"$TMPREGIONECSVFILE"
+	cat "$PROVINCECSVFILE" | grep ",$REGIONE," >"$PROVINCEREGIONECSVFILE"
 	TMPCSVFILE=$TMPREGIONECSVFILE
 fi
 
@@ -314,8 +318,22 @@ echo "Nuovi decessi: <b>$DECESSIOGGI</b> (precedente: $DECESSIIERI)" >>"$HTMLFIL
 echo "          Max: $RECORDDECESSI" >>"$HTMLFILE"
 echo "   Ricoverati: <b>$RICOVERATI</b> (precedente: $RICOVERATIIERI)" >>"$HTMLFILE"
 echo " Terapie int.: <b>$TERAPIEINTENSIVE</b> (precedente: $TERAPIEINTENSIVEIERI)" >>"$HTMLFILE"
-echo "   % positivi: <b>$(printf "%.3f" $PERCPOSITIVI)</b> ($TOTALEPOSITIVI su $POPOLAZIONE abitanti)</pre>" >>"$HTMLFILE"
-echo "<p><img src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
+echo "   % positivi: <b>$(printf "%.3f" $PERCPOSITIVI)</b> ($TOTALEPOSITIVI su $POPOLAZIONE abitanti)" >>"$HTMLFILE"
+
+if [ ! -z "$REGIONE" ]; then
+
+	echo "<br>" >>"$HTMLFILE"
+
+	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
+		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d",")
+		POSITIVIPROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f10 -d",")
+		if [ "$POSITIVIPROVINCIA" != "0" ]; then
+			echo "   $PROVINCIA: $POSITIVIPROVINCIA" >>"$HTMLFILE"
+		fi
+	done
+fi
+
+echo "</pre><p><img src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
 
 cat <<EOF >> $HTMLFILE
 Elaborazione dati forniti dal Dipartimento della Protezione Civile 
