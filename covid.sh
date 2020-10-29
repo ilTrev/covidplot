@@ -325,7 +325,8 @@ if [ ! -z "$REGIONE" ]; then
 	echo "<br>" >>"$HTMLFILE"
 
 	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
-		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d",")
+	PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/ì/\&igrave;/g")
+		
 		POSITIVIPROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f10 -d",")
 		if [ "$POSITIVIPROVINCIA" != "0" ]; then
 			echo "   $PROVINCIA: $POSITIVIPROVINCIA" >>"$HTMLFILE"
