@@ -3,7 +3,9 @@
 MYPATH="/share/Public/bin/covid"
 OUTPATH="$MYPATH/out"
 LATESTFILE="$OUTPATH/covidLatest.csv"
+TMPREGIONIFILE="$OUTPATH/covidLatestRegioni.csv"
 LATESTDONEFILE="$OUTPATH/covidLatestDone.txt"
+TMPSINGOLAREGIONEFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 TMPCSVFILE="$OUTPATH/covidtmp.csv"
 CSVFILE="$OUTPATH/covid.csv"
 HTMLFILE="$OUTPATH/index.html"
@@ -52,10 +54,12 @@ else
 		REGIONEFORMAT=$(echo "$REGIONE" | sed "s/[^[:alnum:]]//g")
 
 		HTMLFILE="$OUTPATH/$REGIONEFORMAT/index.html"
-		TMPREGIONIFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 		INDENT=" - "
 		POPOLAZIONE=$(cat "$MYPATH/regioni.txt"| grep "$REGIONE" | cut -f2 -d",")
 		
+		TMPREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covid"$REGIONEFORMAT"tmp.csv"
+		CSVFILE="$OUTPATH/$REGIONEFORMAT/covid.csv"
+
 		echo "$REGIONE - pop.: $POPOLAZIONE"
 
 		if [ ! -d "$OUTPATH/$REGIONEFORMAT" ]; then 
@@ -82,10 +86,13 @@ if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
 	exit
 fi
 
-
 curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv >"$LATESTFILE" 2>/dev/null
 
 LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
+
+echo "Latest download: $LATESTDOWNLOAD" >>"$LOGFILE"
+echo "Latest done....: $LATESTDONE" >>"$LOGFILE"
+echo "Today..........: $TODAY" >>"$LOGFILE"
 
 if [ "$LATESTDONE" != "$LATESTDOWNLOAD" ] && [ "$TODAY" = "$LATESTDOWNLOAD" ]; then
 	echo "Update found!" >>"$LOGFILE"
@@ -102,12 +109,13 @@ fi
 
 echo "$LATESTDOWNLOAD" > "$LATESTDONEFILE"
 
-if [ ! -z "$REGIONE" ]; then
-	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
-	head -1 "$TMPREGIONIFILE" | cut -f1,2,7- -d"," >"$TMPCSVFILE"
-	cat "$TMPREGIONIFILE" | grep ",$REGIONE," | cut -f1,2,7- -d"," >>"$TMPCSVFILE"
-else
+if [ -z "$REGIONE" ]; then
 	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv >"$TMPCSVFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
+else
+	head -1 "$TMPREGIONIFILE" | cut -f1,2,7- -d"," >"$TMPREGIONECSVFILE"
+	cat "$TMPREGIONIFILE" | grep ",$REGIONE," | cut -f1,2,7- -d"," >>"$TMPREGIONECSVFILE"
+	TMPCSVFILE=$TMPREGIONECSVFILE
 fi
 
 export TAMPONITOTALIIERI=0
@@ -231,9 +239,15 @@ RECORDDECESSI=$(echo $DATIOGGI | cut -f23 -d",")
 
 TOTALEPOSITIVI=$(echo $DATIOGGI | cut -f7 -d",")
 PERCPOSITIVI=$(echo "$TOTALEPOSITIVI $POPOLAZIONE / 100 * p" | dc)
-echo "positivi: $TOTALEPOSITIVI - %positivi $PERCPOSITIVI"
 
-/opt/bin/gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
+if [ -z "$REGIONE" ]; then
+	/opt/bin/gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
+else
+	GNUPLOTCSVFILE="$REGIONEFORMAT""\/covid.csv"
+	cat "$MYPATH""/covid.gnuplot" | sed "s/covid.csv/$GNUPLOTCSVFILE/g" >"$MYPATH/out/$REGIONEFORMAT/covidRegione.gnuplot" 2>>"$LOGFILE"
+	/opt/bin/gnuplot "$MYPATH/out/$REGIONEFORMAT/covidRegione.gnuplot" >"$IMGFILE" 2>>"$LOGFILE"
+fi
+
 curl -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 
 if [ ! -z "$REGIONE" ]; then
