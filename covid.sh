@@ -75,7 +75,11 @@ if [ -z "$REGIONE" ]; then
 	echo "ITALIA - pop. $POPOLAZIONE"	
 fi
 
-IMGFILE="$OUTPATH/covid$REGIONEFORMAT.svg"
+if [ -z "$REGIONE" ]; then
+	IMGFILE="$OUTPATH/covid.svg"
+else
+	IMGFILE="$OUTPATH/$REGIONEFORMAT/covid$REGIONEFORMAT.svg"
+fi
 
 echo "$INDENT""Start.....: $(date) $FORCED" >>"$LOGFILE"
 
@@ -88,13 +92,15 @@ if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
 	exit
 fi
 
-curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv >"$LATESTFILE" 2>/dev/null
+curl -H 'Cache-Control: no-cache' "https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv?$(date +\"%S\")" >"$LATESTFILE" 2>/dev/null
 
 LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
 
-echo "Latest download: $LATESTDOWNLOAD" >>"$LOGFILE"
-echo "Latest done....: $LATESTDONE" >>"$LOGFILE"
-echo "Today..........: $TODAY" >>"$LOGFILE"
+if [ -z "$REGIONE" ]; then
+	echo "Latest download: $LATESTDOWNLOAD" >>"$LOGFILE"
+	echo "Latest done....: $LATESTDONE" >>"$LOGFILE"
+	echo "Today..........: $TODAY" >>"$LOGFILE"
+fi
 
 if [ "$LATESTDONE" != "$LATESTDOWNLOAD" ] && [ "$TODAY" = "$LATESTDOWNLOAD" ]; then
 	echo "Update found!" >>"$LOGFILE"
@@ -112,9 +118,9 @@ fi
 echo "$LATESTDOWNLOAD" > "$LATESTDONEFILE"
 
 if [ -z "$REGIONE" ]; then
-	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv >"$TMPCSVFILE" 2>/dev/null
-	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv >"$TMPREGIONIFILE" 2>/dev/null
-	curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-province/dpc-covid19-ita-province-latest.csv >"$PROVINCECSVFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' "https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv?$(date +\"%S\")" >"$TMPCSVFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' "https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv?$(date +\"%S\")" >"$TMPREGIONIFILE" 2>/dev/null
+	curl -H 'Cache-Control: no-cache' "https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-province/dpc-covid19-ita-province-latest.csv?$(date +\"%S\")" >"$PROVINCECSVFILE" 2>/dev/null
 else
 	head -1 "$TMPREGIONIFILE" | cut -f1,2,7- -d"," >"$TMPREGIONECSVFILE"
 	cat "$TMPREGIONIFILE" | grep ",$REGIONE," | cut -f1,2,7- -d"," >>"$TMPREGIONECSVFILE"
@@ -261,8 +267,11 @@ else
 fi
 
 cat <<EOF >"$HTMLFILE"
-<html>
+<!DOCTYPE html>
+<html lang="it">
 <head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png">
 <!-- Global site tag (gtag.js) - Google Analytics -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=UA-180932911-1"></script>
 <script>
@@ -273,11 +282,18 @@ cat <<EOF >"$HTMLFILE"
   gtag('config', 'UA-180932911-1');
 </script>
 
-<link href='https://fonts.googleapis.com/css?family=Roboto Mono' rel='stylesheet'>
+
+<link href='https://fonts.googleapis.com/css?family=Roboto%20Mono' rel='stylesheet'>
 <style>
 #responsive-image { width: 100%;  height: auto;}
 body { font-family: 'Roboto Mono';font-size: 18px; }
 pre { font-family: 'Roboto Mono';font-size: 18px; }
+h3 {
+  font-weight:bold;
+  text-align:center;
+  font-size:25px;
+} 
+
 </style>
 EOF
 
@@ -287,7 +303,7 @@ cat <<EOF >>"$HTMLFILE"
 <link rel="shortcut icon" type="image/png" href="https://www.iltrev.it/covid/favicon.png"/>
 </head>
 <body>
-<label for="Regioni">Seleziona regione:</label>
+<label>Seleziona regione:</label>
 <select name="forma" onchange="location = this.value;">
 EOF
 
@@ -305,11 +321,12 @@ done
 
 echo "</select>" >>"$HTMLFILE"
 echo "<br>Iscriviti al <a href=\"https://t.me/instantcovid\" target="_blank">Canale Telegram</a>" >>"$HTMLFILE"
+echo "<br><a href="mailto:instantcovid@iltrev.it">Contattami</a>" >>"$HTMLFILE"
 
 
-echo "<h3><center>Situazione COVID-19 - $REGIONEWEB<br>" >>"$HTMLFILE"
+echo "<h3>Situazione COVID-19 - $REGIONEWEB<br>" >>"$HTMLFILE"
 echo "<!-- data -->" $(date +"%d-%m-%Y - %H:%M") >>"$HTMLFILE"
-echo "<br><i>(dati del $DATAULTIMO)</i></center></h3>" >>"$HTMLFILE"
+echo "<br><i>(dati del $DATAULTIMO)</i></h3>" >>"$HTMLFILE"
 echo "<br><pre>Nuovi tamponi: <b>$TAMPONIOGGI</b> (precedente: $TAMPONIIERI)" >>"$HTMLFILE"
 echo "          Max: $RECORDTAMPONI" >>"$HTMLFILE"
 echo "   Nuovi casi: <b>$CASIOGGI $RAPPORTOCASITAMPONIOGGI%</b> (precedente: $CASIIERI $RAPPORTOCASITAMPONIIERI%)" >>"$HTMLFILE"
@@ -324,17 +341,20 @@ if [ ! -z "$REGIONE" ]; then
 
 	echo "<br>" >>"$HTMLFILE"
 
+	TOTALECASIREGIONE=$(tail -1 "$CSVFILE" | cut -f14 -d",")
+	echo "   Totale casi da inizio pandemia: <b>$TOTALECASIREGIONE</b>" >>"$HTMLFILE"
+	echo "<br>   di cui:" >>"$HTMLFILE"
+
 	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
-	PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/ì/\&igrave;/g")
-		
-		POSITIVIPROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f10 -d",")
-		if [ "$POSITIVIPROVINCIA" != "0" ]; then
-			echo "   $PROVINCIA: $POSITIVIPROVINCIA" >>"$HTMLFILE"
+		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/ì/\&igrave;/g")
+		TOTALECASIPROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f10 -d",")
+		if [ "$TOTALECASIPROVINCIA" != "0" ]; then
+			echo "   $PROVINCIA: <b>$TOTALECASIPROVINCIA</b>" >>"$HTMLFILE"
 		fi
 	done
 fi
 
-echo "</pre><p><img src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
+echo "</pre><p><img alt="Grafici" src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
 
 cat <<EOF >> $HTMLFILE
 Elaborazione dati forniti dal Dipartimento della Protezione Civile 
