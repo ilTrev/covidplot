@@ -10,7 +10,7 @@ set style line 100 lt 1 lc rgb "grey" lw .5
 set grid ls 100 
 set style line 101 lt 1 lw 2
 
-set terminal svg size 1600,3700 linewidth 1
+set terminal svg size 1200,2500 linewidth 1
 set multiplot layout 5,1
 set title font "Arial,20" 
 
