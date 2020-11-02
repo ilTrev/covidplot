@@ -93,7 +93,7 @@ if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
 fi
 
 cd "$MYPATH/COVID-19"
-git pull
+git pull >"$LOGFILE" 2>&1
 cd "$MYPATH"
 
 LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
