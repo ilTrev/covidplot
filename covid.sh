@@ -93,7 +93,11 @@ if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
 fi
 
 cd "$MYPATH/COVID-19"
-git pull >"$LOGFILE" 2>&1
+git fetch >"$MYPATH/out/git.log" 2>&1
+if [ $(wc -l "$MYPATH/out/git.log" | cut -f1 -d" ") -gt 0 ]; then
+	git pull >>"$LOGFILE" 2>&1
+fi
+
 cd "$MYPATH"
 
 LATESTDOWNLOAD=$(tail -1 $LATESTFILE | cut -f1 -d"T")
@@ -461,16 +465,23 @@ if [ ! -z "$REGIONE" ]; then
 	echo "<br>" >>"$HTMLFILE"
 
 	TOTALECASIREGIONE=$(tail -1 "$CSVFILE" | cut -f14 -d",")
-	echo "<pre>Totale casi da inizio pandemia: <b>$TOTALECASIREGIONE</b>" >>"$HTMLFILE"
-	echo "<br>di cui:" >>"$HTMLFILE"
+	echo "<table><thead><tr><th colspan=\"6\"><b>$TOTALECASIREGIONE</b> casi da inizio pandemia, di cui:</th></tr></thead>" >>"$HTMLFILE"
 
 	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
 		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/ì/\&igrave;/g")
 		TOTALECASIPROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f10 -d",")
 		if [ "$TOTALECASIPROVINCIA" != "0" ]; then
-			echo "   $PROVINCIA: <b>$TOTALECASIPROVINCIA</b>" >>"$HTMLFILE"
+			if [ "$PROVINCIA" = "Fuori Regione / Provincia Autonoma" ]; then
+				PROVINCIA="Fuori regione"
+			fi
+			if [ "$PROVINCIA" = "In fase di definizione/aggiornamento" ]; then
+				PROVINCIA="In aggiornamento"
+			fi
+			echo "<tr><td>$PROVINCIA</td><td><b>$TOTALECASIPROVINCIA</b></td></tr>" >>"$HTMLFILE"
 		fi
 	done
+
+	echo "</table>" >>"$HTMLFILE"
 fi
 
 echo "</pre><p><img style="width:100%" alt="Grafici" src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
