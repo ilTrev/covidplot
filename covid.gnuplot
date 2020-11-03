@@ -18,29 +18,29 @@ set y2tics
 set title "Tamponi"
 set ylabel "Tamponi giorno"
 set y2label "Positivi/Tamponi"
-plot "/share/Public/bin/covid/out/covid.csv" using 1:19 with lines, \
-     "" using 1:18 with lines  axis x1y2
+plot "/share/Public/bin/covid/out/covid.csv" using 1:19 with lines title columnhead at end, \
+     "" using 1:18 with lines  axis x1y2 title columnhead at end
 
 set title "Casi positivi"
 set ylabel "Nuovi positivi / variazione totale"
 set y2label "Totale positivi"
-plot "" using 1:25 with lines, \
-     "" using 1:24 with lines, \
-     "" using 1:7 with lines axis x1y2
+plot "" using 1:25 with lines title columnhead at end, \
+     "" using 1:24 with lines title columnhead at end, \
+     "" using 1:7 with lines axis x1y2 title columnhead at end
 
 set title "Deceduti"
 set y2tics
 set ylabel "Totale deceduti"
 set y2label "Deceduti giorno"
-plot "" using 1:11 with lines, \
-     "" using 1:26 with lines axis x1y2
+plot "" using 1:11 with lines title columnhead at end, \
+     "" using 1:26 with lines axis x1y2 title columnhead at end
 
 set title "Ricoverati"
 set ylabel "Ricoverati - terapie intensive"
 set y2label "Dimessi - guariti"
-plot "" using 1:3 with lines, \
-     "" using 1:4 with lines, \
-     "" using 1:5 with lines, \
-     "" using 1:10 with lines axis x1y2
+plot "" using 1:3 with lines title columnhead at end, \
+     "" using 1:4 with lines title columnhead at end, \
+     "" using 1:5 with lines title columnhead at end, \
+     "" using 1:10 with lines axis x1y2 title columnhead at end
 
 unset multiplot

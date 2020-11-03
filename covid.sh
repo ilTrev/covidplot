@@ -59,7 +59,8 @@ else
 		HTMLFILE="$REGIONEPATH/index.html"
 
 		INDENT=" - "
-		POPOLAZIONE=$(cat "$MYPATH/regioni.txt"| grep "$REGIONE" | cut -f2 -d",")
+		POPOLAZIONE=$(cat "$MYPATH/regioni.csv"| grep "$REGIONE" | cut -f2 -d",")
+		POSTITERAPIAINTENSIVA=$(cat $MYPATH/regioni.csv | grep "$REGIONE" | cut -f3 -d",") 
 		
 		TMPREGIONECSVFILE="$REGIONEPATH/covid"$REGIONEFORMAT"tmp.csv"
 		PROVINCEREGIONECSVFILE="$REGIONEPATH/covidProvinceLatest.csv"
@@ -79,7 +80,8 @@ else
 fi
 
 if [ -z "$REGIONE" ]; then
-	POPOLAZIONE=$(cat $MYPATH/regioni.txt | grep "Italia" | cut -f2 -d",") 
+	POPOLAZIONE=$(cat $MYPATH/regioni.csv | grep "Italia" | cut -f2 -d",") 
+	POSTITERAPIAINTENSIVA=$(cat $MYPATH/regioni.csv | grep "Italia" | cut -f3 -d",") 
 	echo "ITALIA - pop. $POPOLAZIONE"	
 fi
 
@@ -358,6 +360,9 @@ RECORDDECESSI=$(echo $DATIOGGI | cut -f23 -d",")
 RECORDTERINT=$(echo $DATIOGGI | cut -f35 -d",")
 RECORDRICOVERATI=$(echo $DATIOGGI | cut -f36 -d",")
 
+TOTALEPOSITIVIIERI=$(echo $DATIIERI | cut -f7 -d",")
+PERCPOSITIVIIERI=$(echo "$TOTALEPOSITIVIIERI $POPOLAZIONE / 100 * p" | dc)
+
 TOTALEPOSITIVI=$(echo $DATIOGGI | cut -f7 -d",")
 PERCPOSITIVI=$(echo "$TOTALEPOSITIVI $POPOLAZIONE / 100 * p" | dc)
 
@@ -493,8 +498,8 @@ echo "<tr><td>Nuovi casi</td><td class="highlight">$CASIOGGI</td><td>$CASIIERI</
 echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Decessi</td><td class="highlight">$DECESSIOGGI</td><td>$DECESSIIERI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td><td>$RECORDDECESSI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Ricoverati</td><td class="highlight">$RICOVERATI</td><td>$RICOVERATIIERI</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td><td>$RECORDRICOVERATI</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Terapie int.</td><td class="highlight">$TERAPIEINTENSIVE</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>% positivi<br>($POPOLAZIONE abit.)</td><td>$(printf "%.3f" $PERCPOSITIVI)</td><td>n/a</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Terapie int.<br>(posti: $POSTITERAPIAINTENSIVA)</td><td class="highlight">$TERAPIEINTENSIVE</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>% positivi<br>($POPOLAZIONE abit.)</td><td>$(printf "%.3f" $PERCPOSITIVI)</td><td>$(printf "%.3f" $PERCPOSITIVIIERI)</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "</tbody></table>" >>"$HTMLFILE"
 
 if [ ! -z "$REGIONE" ]; then
