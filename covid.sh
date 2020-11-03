@@ -5,6 +5,7 @@ OUTPATH="$MYPATH/out"
 LATESTFILE="$MYPATH/COVID-19/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv"
 TMPREGIONIFILE="$MYPATH/COVID-19/dati-regioni/dpc-covid19-ita-regioni.csv"
 PROVINCECSVFILE="$MYPATH/COVID-19/dati-province/dpc-covid19-ita-province-latest.csv"
+PROVINCEFULLCSVFILE="$MYPATH/COVID-19/dati-province/dpc-covid19-ita-province.csv"
 LATESTDONEFILE="$OUTPATH/covidLatestDone.txt"
 TMPSINGOLAREGIONEFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 TMPCSVFILE="$MYPATH/COVID-19/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv"
@@ -59,7 +60,8 @@ else
 		POPOLAZIONE=$(cat "$MYPATH/regioni.txt"| grep "$REGIONE" | cut -f2 -d",")
 		
 		TMPREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covid"$REGIONEFORMAT"tmp.csv"
-		PROVINCEREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covidProvince.csv"
+		PROVINCEREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covidProvinceLatest.csv"
+		PROVINCEREGIONEFULLCSVFILE="$OUTPATH/$REGIONEFORMAT/covidProvinceFull.csv"
 		CSVFILE="$OUTPATH/$REGIONEFORMAT/covid.csv"
 
 		echo "$REGIONE - pop.: $POPOLAZIONE"
@@ -93,9 +95,9 @@ if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
 fi
 
 cd "$MYPATH/COVID-19"
-git fetch >"$MYPATH/out/git.log" 2>&1
+/opt/bin/git fetch >"$MYPATH/out/git.log" 2>&1
 if [ $(wc -l "$MYPATH/out/git.log" | cut -f1 -d" ") -gt 0 ]; then
-	git pull >>"$LOGFILE" 2>&1
+	/opt/bin/git pull >>"$LOGFILE" 2>&1
 fi
 
 cd "$MYPATH"
@@ -127,6 +129,10 @@ if [ ! -z "$REGIONE" ]; then
 	head -1 "$TMPREGIONIFILE" | cut -f1,2,7- -d"," >"$TMPREGIONECSVFILE"
 	cat "$TMPREGIONIFILE" | grep ",$REGIONE," | cut -f1,2,7- -d"," >>"$TMPREGIONECSVFILE"
 	cat "$PROVINCECSVFILE" | grep ",$REGIONE," >"$PROVINCEREGIONECSVFILE"
+
+	head -1 "$PROVINCEFULLCSVFILE" >"$PROVINCEREGIONEFULLCSVFILE"
+	cat "$PROVINCEFULLCSVFILE" | grep ",$REGIONE," >>"$PROVINCEREGIONEFULLCSVFILE"
+
 	TMPCSVFILE=$TMPREGIONECSVFILE
 fi
 
@@ -137,12 +143,13 @@ export RECORDTAMPONI=0
 export RECORDTERINT=0
 export RECORDCASI=0
 export RECORDDECESSI=0
+export RECORDRICOVERATI=0
 
 cat "$TMPCSVFILE" | while read LINE; do
 	LINE=$(echo $LINE | sed "s///g")
 
 	if [ $COUNT -eq 0 ]; then
-		echo "$LINE,\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\"" | sed "s/_/ /g" >"$CSVFILE"
+		echo "$LINE,\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
 		((COUNT+=1))
 		continue
 	fi
@@ -152,82 +159,84 @@ cat "$TMPCSVFILE" | while read LINE; do
 	TAMPONITOTALI=$(echo "$LINE" | cut -f15 -d",")
 	TAMPONIIERI=$TAMPONIOGGI
 	TAMPONIOGGI=$(echo "$TAMPONITOTALI $TAMPONITOTALIIERI - p" | dc)
-
 	TERINTOGGI=$(echo "$LINE" | cut -f4 -d",")
+	RICOVERATIOGGI=$(echo "$LINE" | cut -f3 -d",")
+	VARIAZIONE=$(echo "$LINE" | cut -f8 -d",")
+	DECESSITOTALI=$(echo "$LINE" | cut -f11 -d",")
+
+	DECESSIOGGI=$(echo "$DECESSITOTALI $DECESSITOTALIIERI - p" | dc)
+
+	if [ "$DECESSIOGGI" -le "0" ] ; then
+		DECESSIOGGI=0
+	fi
+
+	#medie a 7gg
+
+	CASI7GG=("${CASI7GG[@]}" "$CASI")
+	DECESSI7GG=("${DECESSI7GG[@]}" "$DECESSIOGGI")
+	RICOVERATI7GG=("${RICOVERATI7GG[@]}" "$RICOVERATIOGGI")
+	TAMPONI7GG=("${TAMPONI7GG[@]}" "$TAMPONIOGGI")
 	TERINT7GG=("${TERINT7GG[@]}" "$TERINTOGGI")
+	VARIAZIONI7GG=("${VARIAZIONI7GG[@]}" "$VARIAZIONE")
+
 	if [ "${#TERINT7GG[@]}" -gt 7 ]; then
+		CASI7GG=("${CASI7GG[@]:1}")
+		let MEDIACASI7GG=$(IFS=+; echo "$((${CASI7GG[*]}))")/7
+
+		DECESSI7GG=("${DECESSI7GG[@]:1}")
+		let MEDIADECESSI7GG=$(IFS=+; echo "$((${DECESSI7GG[*]}))")/7
+
+		RICOVERATI7GG=("${RICOVERATI7GG[@]:1}")
+		let MEDIARICOVERATI7GG=$(IFS=+; echo "$((${RICOVERATI7GG[*]}))")/7
+
+		TAMPONI7GG=("${TAMPONI7GG[@]:1}")
+		let MEDIATAMPONI7GG=$(IFS=+; echo "$((${TAMPONI7GG[*]}))")/7
+
 		TERINT7GG=("${TERINT7GG[@]:1}")
 		let MEDIATERINT7GG=$(IFS=+; echo "$((${TERINT7GG[*]}))")/7
+
+		VARIAZIONI7GG=("${VARIAZIONI7GG[@]:1}")
+		let MEDIAVARIAZIONI=$(IFS=+; echo "$((${VARIAZIONI7GG[*]}))")/7
+
 	else
+		MEDIACASI7GG=0
+		MEDIADECESSI7GG=0
+		MEDIARICOVERATI7GG=0
+		MEDIATAMPONI7GG=0
 		MEDIATERINT7GG=0
+		MEDIAVARIAZIONI=0
 	fi
 
 	TERINT14GG=("${TERINT14GG[@]}" "$TERINTOGGI")
+	RICOVERATI14GG=("${RICOVERATI14GG[@]}" "$RICOVERATIOGGI")
+	TAMPONI14GG=("${TAMPONI14GG[@]}" "$TAMPONIOGGI")
+	CASI14GG=("${CASI14GG[@]}" "$CASI")
+	DECESSI14GG=("${DECESSI14GG[@]}" "$DECESSIOGGI")
+
 	if [ "${#TERINT14GG[@]}" -gt 14 ]; then
+		CASI14GG=("${CASI14GG[@]:1}")
+		let MEDIACASI14GG=$(IFS=+; echo "$((${CASI14GG[*]}))")/14
+
+		DECESSI14GG=("${DECESSI14GG[@]:1}")
+		let MEDIADECESSI14GG=$(IFS=+; echo "$((${DECESSI14GG[*]}))")/14
+
+		RICOVERATI14GG=("${RICOVERATI14GG[@]:1}")
+		let MEDIARICOVERATI14GG=$(IFS=+; echo "$((${RICOVERATI14GG[*]}))")/14
+
+		TAMPONI14GG=("${TAMPONI14GG[@]:1}")
+		let MEDIATAMPONI14GG=$(IFS=+; echo "$((${TAMPONI14GG[*]}))")/14
+
 		TERINT14GG=("${TERINT14GG[@]:1}")
 		let MEDIATERINT14GG=$(IFS=+; echo "$((${TERINT14GG[*]}))")/14
 	else
+		MEDIACASI14GG=0
+		MEDIADECESSI14GG=0
+		MEDIARICOVERATI14GG=0
+		MEDIATAMPONI14GG=0
 		MEDIATERINT14GG=0
 	fi
 
-	RICOVERATIOGGI=$(echo "$LINE" | cut -f3 -d",")
-	RICOVERATI7GG=("${RICOVERATI7GG[@]}" "$RICOVERATIOGGI")
-	if [ "${#RICOVERATI7GG[@]}" -gt 7 ]; then
-		RICOVERATI7GG=("${RICOVERATI7GG[@]:1}")
-		let MEDIARICOVERATI7GG=$(IFS=+; echo "$((${RICOVERATI7GG[*]}))")/7
-	else
-		MEDIARICOVERATI7GG=0
-	fi
 
-	RICOVERATI14GG=("${RICOVERATI14GG[@]}" "$RICOVERATIOGGI")
-	if [ "${#RICOVERATI14GG[@]}" -gt 14 ]; then
-		RICOVERATI14GG=("${RICOVERATI14GG[@]:1}")
-		let MEDIARICOVERATI14GG=$(IFS=+; echo "$((${RICOVERATI14GG[*]}))")/14
-	else
-		MEDIARICOVERATI14GG=0
-	fi
-
-	TAMPONI7GG=("${TAMPONI7GG[@]}" "$TAMPONIOGGI")
-	if [ "${#TAMPONI7GG[@]}" -gt 7 ]; then
-		TAMPONI7GG=("${TAMPONI7GG[@]:1}")
-		let MEDIATAMPONI7GG=$(IFS=+; echo "$((${TAMPONI7GG[*]}))")/7
-	else
-		MEDIATAMPONI7GG=0
-	fi
-
-	TAMPONI14GG=("${TAMPONI14GG[@]}" "$TAMPONIOGGI")
-	if [ "${#TAMPONI14GG[@]}" -gt 14 ]; then
-		TAMPONI14GG=("${TAMPONI14GG[@]:1}")
-		let MEDIATAMPONI14GG=$(IFS=+; echo "$((${TAMPONI14GG[*]}))")/14
-	else
-		MEDIATAMPONI14GG=0
-	fi
-
-	CASI7GG=("${CASI7GG[@]}" "$CASI")
-	if [ "${#CASI7GG[@]}" -gt 7 ]; then
-		CASI7GG=("${CASI7GG[@]:1}")
-		let MEDIACASI7GG=$(IFS=+; echo "$((${CASI7GG[*]}))")/7
-	else
-		MEDIACASI7GG=0
-	fi
-
-	CASI14GG=("${CASI14GG[@]}" "$CASI")
-	if [ "${#CASI14GG[@]}" -gt 14 ]; then
-		CASI14GG=("${CASI14GG[@]:1}")
-		let MEDIACASI14GG=$(IFS=+; echo "$((${CASI14GG[*]}))")/14
-	else
-		MEDIACASI14GG=0
-	fi
-
-	VARIAZIONE=$(echo "$LINE" | cut -f8 -d",")
-	VARIAZIONI7GG=("${VARIAZIONI7GG[@]}" "$VARIAZIONE")
-	if [ "${#VARIAZIONI7GG[@]}" -gt 7 ]; then
-		VARIAZIONI7GG=("${VARIAZIONI7GG[@]:1}")
-		let MEDIAVARIAZIONI=$(IFS=+; echo "$((${VARIAZIONI7GG[*]}))")/7
-	else
-		MEDIAVARIAZIONI=0
-	fi
-	
 	if [ "$TAMPONIOGGI" -le "0" ] ; then
 		TAMPONIOGGI=0
 		RAPPORTO=0
@@ -242,28 +251,7 @@ cat "$TMPCSVFILE" | while read LINE; do
 
 	TAMPONITOTALIIERI=$TAMPONITOTALI
 
-	DECESSITOTALI=$(echo "$LINE" | cut -f11 -d",")
-	DECESSIOGGI=$(echo "$DECESSITOTALI $DECESSITOTALIIERI - p" | dc)
-
-	if [ "$DECESSIOGGI" -le "0" ] ; then
-		DECESSIOGGI=0
-	fi
-
-	DECESSI7GG=("${DECESSI7GG[@]}" "$DECESSIOGGI")
-	if [ "${#DECESSI7GG[@]}" -gt 7 ]; then
-		DECESSI7GG=("${DECESSI7GG[@]:1}")
-		let MEDIADECESSI7GG=$(IFS=+; echo "$((${DECESSI7GG[*]}))")/7
-	else
-		MEDIADECESSI7GG=0
-	fi
-
-	DECESSI14GG=("${DECESSI14GG[@]}" "$DECESSIOGGI")
-	if [ "${#DECESSI14GG[@]}" -gt 14 ]; then
-		DECESSI14GG=("${DECESSI14GG[@]:1}")
-		let MEDIADECESSI14GG=$(IFS=+; echo "$((${DECESSI14GG[*]}))")/14
-	else
-		MEDIADECESSI14GG=0
-	fi
+	#Valori massimi rilevati
 
 	if [ $TERINTOGGI -gt $RECORDTERINT ]; then
 		RECORDTERINT=$TERINTOGGI
@@ -281,7 +269,11 @@ cat "$TMPCSVFILE" | while read LINE; do
 		RECORDDECESSI=$DECESSIOGGI
 	fi
 
-	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI7GG,$MEDIAVARIAZIONI,$MEDIADECESSI7GG,$MEDIATAMPONI7GG,$MEDIARICOVERATI7GG,$MEDIATERINT7GG,$MEDIATERINT14GG,$MEDIARICOVERATI14GG,$MEDIADECESSI14GG,$MEDIATAMPONI14GG,$MEDIACASI14GG,$RECORDTERINT" >>"$CSVFILE"
+	if [ $RICOVERATIOGGI -gt $RECORDRICOVERATI ]; then
+		RECORDRICOVERATI=$RICOVERATIOGGI
+	fi
+
+	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI7GG,$MEDIAVARIAZIONI,$MEDIADECESSI7GG,$MEDIATAMPONI7GG,$MEDIARICOVERATI7GG,$MEDIATERINT7GG,$MEDIATERINT14GG,$MEDIARICOVERATI14GG,$MEDIADECESSI14GG,$MEDIATAMPONI14GG,$MEDIACASI14GG,$RECORDTERINT,$RECORDRICOVERATI" >>"$CSVFILE"
 
 	DECESSITOTALIIERI=$DECESSITOTALI
 
@@ -322,6 +314,7 @@ RECORDTAMPONI=$(echo $DATIOGGI | cut -f21 -d",")
 RECORDCASI=$(echo $DATIOGGI | cut -f22 -d",")
 RECORDDECESSI=$(echo $DATIOGGI | cut -f23 -d",")
 RECORDTERINT=$(echo $DATIOGGI | cut -f35 -d",")
+RECORDRICOVERATI=$(echo $DATIOGGI | cut -f36 -d",")
 
 TOTALEPOSITIVI=$(echo $DATIOGGI | cut -f7 -d",")
 PERCPOSITIVI=$(echo "$TOTALEPOSITIVI $POPOLAZIONE / 100 * p" | dc)
@@ -450,13 +443,13 @@ echo "<h3>Situazione COVID-19 - $REGIONEWEB<br>" >>"$HTMLFILE"
 echo "<!-- data -->" $(date +"%d-%m-%Y - %H:%M") >>"$HTMLFILE"
 echo "<br><i>(dati del $DATAULTIMO)</i></h3>" >>"$HTMLFILE"
 
-echo "<table><thead><tr><th></th><th>Ultimo</th><th>Preced.</th><th>Max</th><th>Media 7gg</th><th>Media 14gg</th></tr></thead>" >>"$HTMLFILE"
-echo "<tbody><tr><td>Tamponi</td><td>$TAMPONIOGGI</td><td>$TAMPONIIERI</td><td>$RECORDTAMPONI</td><td>$MEDIATAMPONI7GG</td><td>$MEDIATAMPONI14GG</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Nuovi casi</td><td class="highlight">$CASIOGGI</td><td>$CASIIERI</td><td>$RECORDCASI</td><td>$MEDIACASI7GG</td><td>$MEDIACASI14GG</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>%posit./tamponi</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Decessi</td><td class="highlight">$DECESSIOGGI</td><td>$DECESSIIERI</td><td>$RECORDDECESSI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Ricoverati</td><td class="highlight">$RICOVERATI</td><td>$RICOVERATIIERI</td><td>n/a</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Terapie int.</td><td class="highlight">$TERAPIEINTENSIVE</td><td>$TERAPIEINTENSIVEIERI</td><td>$RECORDTERINT</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td></tr>" >>"$HTMLFILE"
+echo "<table><thead><tr><th></th><th>Ultimo</th><th>Preced.</th><th>Media 7gg</th><th>Media 14gg</th><th>Max</th></tr></thead>" >>"$HTMLFILE"
+echo "<tbody><tr><td>Tamponi</td><td>$TAMPONIOGGI</td><td>$TAMPONIIERI</td><td>$MEDIATAMPONI7GG</td><td>$MEDIATAMPONI14GG</td><td>$RECORDTAMPONI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Nuovi casi</td><td class="highlight">$CASIOGGI</td><td>$CASIIERI</td><td>$MEDIACASI7GG</td><td>$MEDIACASI14GG</td><td>$RECORDCASI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Decessi</td><td class="highlight">$DECESSIOGGI</td><td>$DECESSIIERI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td><td>$RECORDDECESSI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Ricoverati</td><td class="highlight">$RICOVERATI</td><td>$RICOVERATIIERI</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td><td>$RECORDRICOVERATI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Terapie int.</td><td class="highlight">$TERAPIEINTENSIVE</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>% positivi<br>($POPOLAZIONE abit.)</td><td>$(printf "%.3f" $PERCPOSITIVI)</td><td>n/a</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "</tbody></table>" >>"$HTMLFILE"
 
@@ -465,7 +458,7 @@ if [ ! -z "$REGIONE" ]; then
 	echo "<br>" >>"$HTMLFILE"
 
 	TOTALECASIREGIONE=$(tail -1 "$CSVFILE" | cut -f14 -d",")
-	echo "<table><thead><tr><th colspan=\"6\"><b>$TOTALECASIREGIONE</b> casi da inizio pandemia, di cui:</th></tr></thead>" >>"$HTMLFILE"
+	echo "<table><thead><tr><th colspan=\"2\"><b>$TOTALECASIREGIONE</b> casi da inizio pandemia, di cui:</th></tr></thead>" >>"$HTMLFILE"
 
 	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
 		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/ì/\&igrave;/g")
