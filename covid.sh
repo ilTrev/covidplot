@@ -55,19 +55,25 @@ else
 
 		REGIONEFORMAT=$(echo "$REGIONE" | sed "s/[^[:alnum:]]//g")
 
-		HTMLFILE="$OUTPATH/$REGIONEFORMAT/index.html"
+		REGIONEPATH="$OUTPATH/$REGIONEFORMAT"
+		HTMLFILE="$REGIONEPATH/index.html"
+
 		INDENT=" - "
 		POPOLAZIONE=$(cat "$MYPATH/regioni.txt"| grep "$REGIONE" | cut -f2 -d",")
 		
-		TMPREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covid"$REGIONEFORMAT"tmp.csv"
-		PROVINCEREGIONECSVFILE="$OUTPATH/$REGIONEFORMAT/covidProvinceLatest.csv"
-		PROVINCEREGIONEFULLCSVFILE="$OUTPATH/$REGIONEFORMAT/covidProvinceFull.csv"
-		CSVFILE="$OUTPATH/$REGIONEFORMAT/covid.csv"
+		TMPREGIONECSVFILE="$REGIONEPATH/covid"$REGIONEFORMAT"tmp.csv"
+		PROVINCEREGIONECSVFILE="$REGIONEPATH/covidProvinceLatest.csv"
+		PROVINCEREGIONEFULLCSVFILE="$REGIONEPATH/covidProvinceFull.csv"
+		CSVFILE="$REGIONEPATH/covid.csv"
 
 		echo "$REGIONE - pop.: $POPOLAZIONE"
 
-		if [ ! -d "$OUTPATH/$REGIONEFORMAT" ]; then 
-			mkdir "$OUTPATH/$REGIONEFORMAT"
+		if [ ! -d "$REGIONEPATH" ]; then 
+			mkdir "$REGIONEPATH"
+		fi
+
+		if [ ! -d "$REGIONEPATH/province" ]; then 
+			mkdir "$REGIONEPATH/province"	
 		fi
 	fi
 fi
@@ -80,7 +86,8 @@ fi
 if [ -z "$REGIONE" ]; then
 	IMGFILE="$OUTPATH/covid.svg"
 else
-	IMGFILE="$OUTPATH/$REGIONEFORMAT/covid$REGIONEFORMAT.svg"
+	IMGFILE="$REGIONEPATH/covid$REGIONEFORMAT.svg"
+	REGIONEIMGFILE="$REGIONEPATH/covidProvince$REGIONEFORMAT.svg"
 fi
 
 echo "$INDENT""Start.....: $(date) $FORCED" >>"$LOGFILE"
@@ -131,9 +138,44 @@ if [ ! -z "$REGIONE" ]; then
 	cat "$PROVINCECSVFILE" | grep ",$REGIONE," >"$PROVINCEREGIONECSVFILE"
 
 	head -1 "$PROVINCEFULLCSVFILE" >"$PROVINCEREGIONEFULLCSVFILE"
-	cat "$PROVINCEFULLCSVFILE" | grep ",$REGIONE," >>"$PROVINCEREGIONEFULLCSVFILE"
+	cat "$PROVINCEFULLCSVFILE" | grep ",$REGIONE," | sed "s/In fase di definizione/In aggiornamento/g" >>"$PROVINCEREGIONEFULLCSVFILE"
 
 	TMPCSVFILE=$TMPREGIONECSVFILE
+
+	cat <<EOF >"$REGIONEPATH/covidProvince.gnuplot"
+set datafile separator ","
+
+unset key
+set xdata time 			
+set timefmt "%Y-%m-%dT%H:%M"
+set format x "%d-%b"
+set key autotitle columnhead
+
+set style line 100 lt 1 lc rgb "grey" lw .5
+set grid ls 100 
+set style line 101 lt 1 lw 2
+
+set terminal svg size 1600,1200 linewidth 1
+set multiplot layout 1,1
+set title font "Arial,20" 
+
+set title "Province"
+set y2label "Casi totali"
+set y2tics
+unset ytics
+
+EOF
+
+	PLOT="plot "
+	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
+		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/\/.*//g" | sed "s/In fase di definizione/In aggiornamento/g")
+		head -1 $PROVINCEREGIONEFULLCSVFILE | sed "s/totale_casi/$PROVINCIA/g" >"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
+		cat "$PROVINCEREGIONEFULLCSVFILE" | grep ",$PROVINCIA," >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
+
+		echo "$PLOT\"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv\" using 1:10 with lines axis x1y2 title \"$PROVINCIA\" at end, \\" >>"$REGIONEPATH/covidProvince.gnuplot"
+
+		PLOT=""
+	done
 fi
 
 export TAMPONITOTALIIERI=0
@@ -334,8 +376,10 @@ if [ -z "$REGIONE" ]; then
 	/opt/bin/gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 else
 	GNUPLOTCSVFILE="$REGIONEFORMAT""\/covid.csv"
-	cat "$MYPATH""/covid.gnuplot" | sed "s/covid.csv/$GNUPLOTCSVFILE/g" >"$MYPATH/out/$REGIONEFORMAT/covidRegione.gnuplot" 2>>"$LOGFILE"
-	/opt/bin/gnuplot "$MYPATH/out/$REGIONEFORMAT/covidRegione.gnuplot" >"$IMGFILE" 2>>"$LOGFILE"
+	cat "$MYPATH""/covid.gnuplot" | sed "s/covid.csv/$GNUPLOTCSVFILE/g" >"$REGIONEPATH/covidRegione.gnuplot" 2>>"$LOGFILE"
+	/opt/bin/gnuplot "$REGIONEPATH/covidRegione.gnuplot" >"$IMGFILE" 2>>"$LOGFILE"
+	/opt/bin/gnuplot "$REGIONEPATH/covidProvince.gnuplot" >$REGIONEIMGFILE 2>>"$LOGFILE"
+	curl -T "$REGIONEIMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 fi
 
 curl -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
@@ -477,7 +521,10 @@ if [ ! -z "$REGIONE" ]; then
 	echo "</table>" >>"$HTMLFILE"
 fi
 
-echo "</pre><p><img style="width:100%" alt="Grafici" src="https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg" id="responsive-image" /></p>" >>"$HTMLFILE"
+if [ ! -z "$REGIONEIMGFILE" ]; then
+	echo "</pre><p><img style=\"width:100%\" alt=\"Grafico province\" src=\"https://www.iltrev.it/covid/covidProvince$REGIONEFORMAT.svg\" id=\"responsive-image\" /></p>" >>"$HTMLFILE"
+fi
+echo "</pre><p><img style=\"width:100%\" alt=\"Grafici\" src=\"https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg\" id=\"responsive-image\" /></p>" >>"$HTMLFILE"
 
 cat <<EOF >> $HTMLFILE
 Elaborazione dati forniti dal Dipartimento della Protezione Civile 
