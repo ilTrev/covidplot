@@ -10,6 +10,7 @@ LATESTDONEFILE="$OUTPATH/covidLatestDone.txt"
 TMPSINGOLAREGIONEFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 TMPCSVFILE="$MYPATH/COVID-19/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv"
 CSVFILE="$OUTPATH/covid.csv"
+CSVFILESHORT="$OUTPATH/covidshort.csv"
 HTMLFILE="$OUTPATH/index.html"
 HTMLFILETMP="$OUTPATH/indextmp.html"
 LOGFILE="$OUTPATH/covid.log"
@@ -40,6 +41,7 @@ REGIONI=( \
 	"Valle d'Aosta" \
 	"Veneto" \
 )
+DAYSAMOUNT=90
 
 if [ $(cat "$LOGFILE" | wc -l) -gt 1000 ]; then 
 	tail -1000 "$LOGFILE" >/tmp/covid.log
@@ -66,6 +68,7 @@ else
 		PROVINCEREGIONECSVFILE="$REGIONEPATH/covidProvinceLatest.csv"
 		PROVINCEREGIONEFULLCSVFILE="$REGIONEPATH/covidProvinceFull.csv"
 		CSVFILE="$REGIONEPATH/covid.csv"
+		CSVFILESHORT="$REGIONEPATH/covidshort.csv"
 
 		echo "$REGIONE - pop.: $POPOLAZIONE"
 
@@ -87,9 +90,12 @@ fi
 
 if [ -z "$REGIONE" ]; then
 	IMGFILE="$OUTPATH/covid.svg"
+	IMGFILESHORT="$OUTPATH/covidshort.svg"
 else
 	IMGFILE="$REGIONEPATH/covid$REGIONEFORMAT.svg"
+	IMGFILESHORT="$REGIONEPATH/covid$REGIONEFORMAT""short.svg"
 	REGIONEIMGFILE="$REGIONEPATH/covidProvince$REGIONEFORMAT.svg"
+	REGIONEIMGFILESHORT="$REGIONEPATH/covidProvince$REGIONEFORMAT""short.svg"
 fi
 
 echo "$INDENT""Start.....: $(date) $FORCED" >>"$LOGFILE"
@@ -157,7 +163,7 @@ set style line 100 lt 1 lc rgb "grey" lw .5
 set grid ls 100 
 set style line 101 lt 1 lw 2
 
-set terminal svg size 1600,1200 linewidth 1
+set terminal svg size 1920,1080 linewidth 1
 set multiplot layout 1,1
 set title font "Arial,20" 
 
@@ -173,6 +179,9 @@ EOF
 		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/\/.*//g" | sed "s/In fase di definizione/In aggiornamento/g")
 		head -1 $PROVINCEREGIONEFULLCSVFILE | sed "s/totale_casi/$PROVINCIA/g" >"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
 		cat "$PROVINCEREGIONEFULLCSVFILE" | grep ",$PROVINCIA," >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
+
+		head -1 "$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv" >"$REGIONEPATH/province/covid$REGIONE$PROVINCIA""short"
+		tail -$DAYSAMOUNT "$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv" >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA""short"
 
 		echo "$PLOT\"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv\" using 1:10 with lines axis x1y2 title \"$PROVINCIA\" at end, \\" >>"$REGIONEPATH/covidProvince.gnuplot"
 
@@ -323,6 +332,9 @@ cat "$TMPCSVFILE" | while read LINE; do
 
 done
 
+head -1 $CSVFILE >$CSVFILESHORT
+tail -$DAYSAMOUNT $CSVFILE >>$CSVFILESHORT
+
 DATIALTROIERI=$(tail -3 "$CSVFILE" | head -1)
 DATIIERI=$(tail -2 "$CSVFILE" | head -1)
 DATIOGGI=$(tail -1 "$CSVFILE")
@@ -378,16 +390,27 @@ MEDIATAMPONI14GG=$(echo $DATIOGGI | cut -f33 -d",")
 MEDIACASI14GG=$(echo $DATIOGGI | cut -f34 -d",")
 
 if [ -z "$REGIONE" ]; then
-	/opt/bin/gnuplot /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
+	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covid.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
+	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covidshort.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILESHORT" 2>>"$LOGFILE"
 else
-	GNUPLOTCSVFILE="$REGIONEFORMAT""\/covid.csv"
-	cat "$MYPATH""/covid.gnuplot" | sed "s/covid.csv/$GNUPLOTCSVFILE/g" >"$REGIONEPATH/covidRegione.gnuplot" 2>>"$LOGFILE"
-	/opt/bin/gnuplot "$REGIONEPATH/covidRegione.gnuplot" >"$IMGFILE" 2>>"$LOGFILE"
-	/opt/bin/gnuplot "$REGIONEPATH/covidProvince.gnuplot" >$REGIONEIMGFILE 2>>"$LOGFILE"
+	GNUPLOTCSVFILE="$REGIONEFORMAT""/covid.csv"
+	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/$GNUPLOTCSVFILE" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
+	GNUPLOTCSVFILE="$REGIONEFORMAT""/covidshort.csv"
+	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/$GNUPLOTCSVFILE" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILESHORT" 2>>"$LOGFILE"
+
+	/opt/bin/gnuplot "$REGIONEPATH/covidProvince.gnuplot" >"$REGIONEIMGFILE" 2>>"$LOGFILE"
 	curl -T "$REGIONEIMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+
+	ls "$REGIONEPATH/province/"*short | while read FILE; do
+		NEWFILE=$(echo $FILE | sed "s/short$//g")
+		mv "$FILE" "$NEWFILE.csv"
+	done
+	/opt/bin/gnuplot "$REGIONEPATH/covidProvince.gnuplot" >"$REGIONEIMGFILESHORT" 2>>"$LOGFILE"
+	curl -T "$REGIONEIMGFILESHORT" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 fi
 
 curl -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+curl -T "$IMGFILESHORT" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 
 if [ ! -z "$REGIONE" ]; then
 	REGIONEWEB="$REGIONE"
@@ -415,7 +438,6 @@ cat <<EOF >"$HTMLFILE"
 
 <link href='https://fonts.googleapis.com/css?family=Roboto%20Mono' rel='stylesheet'>
 <style>
-#responsive-image { width: 100%;  height: auto;}
 body {
   font-family: 'Roboto Mono';
   font-size: 10px; 
@@ -492,7 +514,7 @@ echo "<h3>Situazione COVID-19 - $REGIONEWEB<br>" >>"$HTMLFILE"
 echo "<!-- data -->" $(date +"%d-%m-%Y - %H:%M") >>"$HTMLFILE"
 echo "<br><i>(dati del $DATAULTIMO)</i></h3>" >>"$HTMLFILE"
 
-echo "<table><thead><tr><th></th><th>Ultimo</th><th>Preced.</th><th>Media 7gg</th><th>Media 14gg</th><th>Max</th></tr></thead>" >>"$HTMLFILE"
+echo "<table><thead><tr><th></th><th>Ultimo</th><th>Preced.</th><th>Media<br>7gg</th><th>Media<br>14gg</th><th>Max</th></tr></thead>" >>"$HTMLFILE"
 echo "<tbody><tr><td>Tamponi</td><td>$TAMPONIOGGI</td><td>$TAMPONIIERI</td><td>$MEDIATAMPONI7GG</td><td>$MEDIATAMPONI14GG</td><td>$RECORDTAMPONI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Nuovi casi</td><td class="highlight">$CASIOGGI</td><td>$CASIIERI</td><td>$MEDIACASI7GG</td><td>$MEDIACASI14GG</td><td>$RECORDCASI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
@@ -526,10 +548,18 @@ if [ ! -z "$REGIONE" ]; then
 	echo "</table>" >>"$HTMLFILE"
 fi
 
+echo "<a href=\"#recenti\">Vai a ultimi $DAYSAMOUNT giorni</a><br>" >>"$HTMLFILE"
+
 if [ ! -z "$REGIONEIMGFILE" ]; then
-	echo "</pre><p><img style=\"width:100%\" alt=\"Grafico province\" src=\"https://www.iltrev.it/covid/covidProvince$REGIONEFORMAT.svg\" id=\"responsive-image\" /></p>" >>"$HTMLFILE"
+	echo "<p><img style=\"width:100%\" alt=\"Grafico province\" src=\"https://www.iltrev.it/covid/covidProvince$REGIONEFORMAT.svg\"  /></p>" >>"$HTMLFILE"
 fi
-echo "</pre><p><img style=\"width:100%\" alt=\"Grafici\" src=\"https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg\" id=\"responsive-image\" /></p>" >>"$HTMLFILE"
+echo "<p><img style=\"width:100%\" alt=\"Grafici\" src=\"https://www.iltrev.it/covid/covid$REGIONEFORMAT.svg\"  /></p>" >>"$HTMLFILE"
+
+echo "<p id=\"recenti\"><h3>Ultimi $DAYSAMOUNT giorni</h3><p>" >>"$HTMLFILE"
+if [ ! -z "$REGIONEIMGFILESHORT" ]; then
+	echo "<p><img style=\"width:100%\" alt=\"Grafico province\" src=\"https://www.iltrev.it/covid/covidProvince$REGIONEFORMAT""short.svg\"  /></p>" >>"$HTMLFILE"
+fi
+echo "<img style=\"width:100%\" alt=\"Grafici\" src=\"https://www.iltrev.it/covid/covid$REGIONEFORMAT""short.svg\"  /></p>" >>"$HTMLFILE"
 
 cat <<EOF >> $HTMLFILE
 Elaborazione dati forniti dal Dipartimento della Protezione Civile 
@@ -548,7 +578,7 @@ curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
 if [ -z "$FORCED" ]; then
 	echo "Started Telegram post: $(date)" >>"$LOGFILE"
-	curl -X POST -H 'Content-Type: application/json' -d "{ \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
 	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
 fi
 
