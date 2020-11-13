@@ -14,6 +14,8 @@ CSVFILE="$OUTPATH/covid.csv"
 CSVFILESHORT="$OUTPATH/covidshort.csv"
 HTMLFILE="$OUTPATH/index.html"
 HTMLFILETMP="$OUTPATH/indextmp.html"
+RTHTMLFILE="$OUTPATH/rt.html"
+RTCSVFILE="$OUTPATH/rt.csv"
 LOGFILE="$OUTPATH/covid.log"
 CREDENTIALS=$(cat $MYPATH/ftpcredentials.credential)
 TELEGRAM_BOT_TOKEN=$(cat $MYPATH/telegramtoken.credential)
@@ -173,8 +175,8 @@ unset ytics
 EOF
 
 	PLOT="plot "
-	cat $PROVINCEREGIONECSVFILE | while read RIGAPROVINCIA; do
-		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/\/.*//g" | sed "s/In fase di definizione/In aggiornamento/g")
+	cat $PROVINCEREGIONECSVFILE | grep -v "definizione" | grep -v "Fuori Regione" | while read RIGAPROVINCIA; do
+		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/\/.*//g")
 		head -1 $PROVINCEREGIONEFULLCSVFILE | sed "s/totale_casi/$PROVINCIA/g" >"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
 		cat "$PROVINCEREGIONEFULLCSVFILE" | grep ",$PROVINCIA," >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
 
@@ -220,17 +222,22 @@ VARIAZIONI14GG=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 LINES=$(wc -l "$TMPCSVFILE" | cut -f1 -d" ")
 ((LINES-=1))
 
-echo "$(head -1 $TMPCSVFILE),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
+echo "$(head -1 $TMPCSVFILE | sed "s///g"),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
 
-tail -$LINES "$TMPCSVFILE" | while read LINE; do
+tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	CASIIERI=$CASI
 	TAMPONIIERI=$TAMPONIOGGI
 	TAMPONITOTALIIERI=$TAMPONITOTALI
 
-	IFS="," read UNO DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI <<<"$LINE"
+	IFS="," read UNO DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI NOTE <<<"$LINE"
 
-	TAMPONIOGGI=$(echo "$TAMPONITOTALI $TAMPONITOTALIIERI - p" | dc)
-	DECESSIOGGI=$(echo "$DECESSITOTALI $DECESSITOTALIIERI - p" | dc)
+	if [ "$NOTE" != "" ]; then
+		NOTEFIXED=$(echo $NOTE | sed "s/\,//g")
+		LINE=$(echo $LINE | cut -f1-16 -d",")",$NOTEFIXED"
+	fi
+
+	(( TAMPONIOGGI = TAMPONITOTALI - TAMPONITOTALIIERI ))
+	(( DECESSIOGGI = DECESSITOTALI - DECESSITOTALIIERI ))
 
 	if (( DECESSIOGGI < 0 )) ; then
 		DECESSIOGGI=0
@@ -279,8 +286,8 @@ tail -$LINES "$TMPCSVFILE" | while read LINE; do
 		TAMPONIOGGI=0
 		RAPPORTO=0
 	else
-		RAPPORTO=$(echo "$CASI $TAMPONIOGGI / p" | dc)
-		if (( $(echo "$RAPPORTO < 0" | bc -l) )); then
+		RAPPORTO=$(echo "$CASI / $TAMPONIOGGI" | /opt/bin/bc -l)
+		if (( $(echo "$RAPPORTO < 0" | /opt/bin/bc -l) )); then
 			RAPPORTO=0
 		fi
 	fi
@@ -306,17 +313,19 @@ tail -$LINES "$TMPCSVFILE" | while read LINE; do
 	if (( RICOVERATIOGGI > RECORDRICOVERATI )); then
 		RECORDRICOVERATI=$RICOVERATIOGGI
 	fi
-
-	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI7GG,$MEDIAVARIAZIONI,$MEDIADECESSI7GG,$MEDIATAMPONI7GG,$MEDIARICOVERATI7GG,$MEDIATERINT7GG,$MEDIATERINT14GG,$MEDIARICOVERATI14GG,$MEDIADECESSI14GG,$MEDIATAMPONI14GG,$MEDIACASI14GG,$RECORDTERINT,$RECORDRICOVERATI" | sed "s/\".*\"//g" >>"$CSVFILE" 
+	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI7GG,$MEDIAVARIAZIONI,$MEDIADECESSI7GG,$MEDIATAMPONI7GG,$MEDIARICOVERATI7GG,$MEDIATERINT7GG,$MEDIATERINT14GG,$MEDIARICOVERATI14GG,$MEDIADECESSI14GG,$MEDIATAMPONI14GG,$MEDIACASI14GG,$RECORDTERINT,$RECORDRICOVERATI" >>"$CSVFILE" 
 
 	DECESSITOTALIIERI=$DECESSITOTALI
 
 done
 
+
 head -1 $CSVFILE >$CSVFILESHORT
 tail -$DAYSAMOUNT $CSVFILE >>$CSVFILESHORT
 
 NOTA=$(tail -1 $TMPCSVFILE | cut -f17- -d"," | sed "s/\"//g")
+
+DATIMENOQUATTRO=$(tail -5 "$CSVFILE" | head -1)
 DATIALTROIERI=$(tail -3 "$CSVFILE" | head -1)
 DATIIERI=$(tail -2 "$CSVFILE" | head -1)
 DATIOGGI=$(tail -1 "$CSVFILE")
@@ -325,23 +334,86 @@ DECESSITOTALIALTROIERI=$(echo $DATIALTROIERI | cut -f11 -d",")
 TAMPONITOTALIALTROIERI=$(echo $DATIALTROIERI | cut -f15 -d",")
 
 IFS="," read v1 v2 RICOVERATIIERI TERAPIEINTENSIVEIERI v5 v6 TOTALEPOSITIVIIERI v8 CASIIERI v10 DECESSITOTALIIERI v12 v13 v14 TAMPONITOTALIIERI v16 v17 v18 v19 DECESSIIERI RESTO <<<"$DATIIERI"
-IFS="," read v1 v2 RICOVERATI     TERAPIEINTENSIVE v5 v6 TOTALEPOSITIVI v8 CASIOGGI v10 DECESSITOTALI v12 v13 v14 TAMPONITOTALI v16 v17 v18 v19 DECESSIOGGI RECORDTAMPONI RECORDCASI RECORDDECESSI MEDIACASI7GG v25 MEDIADECESSI7GG MEDIATAMPONI7GG MEDIARICOVERATI7GG MEDIATERINT7GG MEDIATERINT14GG MEDIARICOVERATI14GG MEDIADECESSI14GG MEDIATAMPONI14GG MEDIACASI14GG RECORDTERINT RECORDRICOVERATI RESTO <<<"$DATIOGGI"
+IFS="," read v1 v2 RICOVERATI     TERAPIEINTENSIVE v5 v6 TOTALEPOSITIVI v8 CASIOGGI DIMESSIGUARITI DECESSITOTALI v12 v13 TOTALECASI TAMPONITOTALI v16 v17 v18 v19 DECESSIOGGI RECORDTAMPONI RECORDCASI RECORDDECESSI MEDIACASI7GG v25 MEDIADECESSI7GG MEDIATAMPONI7GG MEDIARICOVERATI7GG MEDIATERINT7GG MEDIATERINT14GG MEDIARICOVERATI14GG MEDIADECESSI14GG MEDIATAMPONI14GG MEDIACASI14GG RECORDTERINT RECORDRICOVERATI RESTO <<<"$DATIOGGI"
 
 (( TAMPONIIERI = TAMPONITOTALIIERI - TAMPONITOTALIALTROIERI ))
 (( TAMPONIOGGI = TAMPONITOTALI - TAMPONITOTALIIERI ))
 
-PERCPOSITIVIIERI=$(echo "$TOTALEPOSITIVIIERI $POPOLAZIONE / 100 * p" | dc)
-RAPPORTOCASITAMPONIIERI=$(printf "%.2f" $(echo "$CASIIERI $TAMPONIIERI / 100 * p" | dc))
-PERCPOSITIVI=$(echo "$TOTALEPOSITIVI $POPOLAZIONE / 100 * p" | dc)
-RAPPORTOCASITAMPONIOGGI=$(printf "%.2f" $(echo "$CASIOGGI $TAMPONIOGGI / 100 * p" | dc))
+PERCPOSITIVIIERI=$(echo "$TOTALEPOSITIVIIERI / $POPOLAZIONE * 100" | /opt/bin/bc -l)
+PERCPOSITIVI=$(echo "$TOTALEPOSITIVI / $POPOLAZIONE * 100" | /opt/bin/bc -l)
+
+RAPPORTOCASITAMPONIIERI=$(printf "%.2f" $(echo "$CASIIERI / $TAMPONIIERI * 100" | /opt/bin/bc -l))
+RAPPORTOCASITAMPONIOGGI=$(printf "%.2f" $(echo "$CASIOGGI / $TAMPONIOGGI * 100" | /opt/bin/bc -l))
 
 DATAULTIMOTMP=$(echo $DATIOGGI | cut -f1 -d"," | sed "s/T/ /g" | sed "s/\"//g")
 DATAULTIMO=$(date -d"$DATAULTIMOTMP" +"%d-%m-%Y - %H:%M:%S")
 
+# Rt
+#dimessi guariti
+ALPHAMENOQUATTRO=$(echo $DATIMENOQUATTRO | cut -f10 -d",") 
+#infetti
+BETAMENOQUATTRO=$(echo $DATIMENOQUATTRO | cut -f14 -d",") 
+#deceduti
+GAMMAMENOQUATTRO=$(echo $DATIMENOQUATTRO | cut -f11 -d",") 
+ALPHAOGGI=$DIMESSIGUARITI
+BETAOGGI=$TOTALECASI
+GAMMAOGGI=$DECESSITOTALI
+
+(( ALPHA = ALPHAOGGI - ALPHAMENOQUATTRO ))
+(( BETA = BETAOGGI - BETAMENOQUATTRO ))
+(( GAMMA = GAMMAOGGI - GAMMAMENOQUATTRO ))
+RT=$(echo "$BETA / ( $ALPHA + $GAMMA )" | bc -l)
+RT=$(printf "%.2f" $RT)
+
 if [ -z "$REGIONE" ]; then
+	cat <<EOF >"$RTHTMLFILE"
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png">
+<meta name="viewport" content="width=device-width">
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-180932911-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-180932911-1');
+</script>
+
+<link href='https://fonts.googleapis.com/css?family=Roboto%20Mono' rel='stylesheet'>
+
+<style>
+body {
+  font-family: 'Roboto Mono';
+  font-size: 10px; 
+}
+</style>
+
+</head>
+<body>
+Valore Rt calcolato secondo il <a href="https://sciencecue.it/coronavirus-come-si-calcola-indice-contagiosita-rt/21898/">modello INFN</a><br>
+(<b><i>NON</i></b> quello ISS, basato su parametri non a nostra disposizione)<br><br>
+Rt = &beta; / ( &alpha; + &gamma; )<br><br>
+Con:<br><br>
+&alpha; = differenza tra individui <i>guariti</i> all'ultimo rilevamento e quattro giorni prima<br>
+&beta; = differenza tra individui <i>contagiati</i> all'ultimo rilevamento e quattro giorni prima<br>
+&gamma; = differenza tra individui <i>deceduti</i> all'ultimo rilevamento e quattro giorni prima<br><br>
+EOF
+	echo "<b>Rt Nazionale: $RT</b><br>" >>"$RTHTMLFILE"
+	echo "<br><table><thead><tr><td>Regione</td><td>Rt</td></tr></thead>" >>"$RTHTMLFILE"
+	echo >$RTCSVFILE
+
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covid.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covidshort.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILESHORT" 2>>"$LOGFILE"
 else
+
+	echo "$RT,$REGIONE" >>$RTCSVFILE
+
 	GNUPLOTCSVFILE="$REGIONEFORMAT""/covid.csv"
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/$GNUPLOTCSVFILE" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 	GNUPLOTCSVFILE="$REGIONEFORMAT""/covidshort.csv"
@@ -493,7 +565,7 @@ if [ ! -z "$REGIONE" ]; then
 				PROVINCIA="In aggiornamento"
 			else
 				ABITANTIPROVINCIA=$(grep "$PROVINCIA" "$MYPATH/province.csv" | cut -f2 -d",")
-				PERCENTODEC=$(echo "$TOTALECASIPROVINCIA $ABITANTIPROVINCIA / 100 * p" | dc)
+				PERCENTODEC=$(echo "$TOTALECASIPROVINCIA / $ABITANTIPROVINCIA * 100" | /opt/bin/bc -l)
 				PERCENTO=$(printf "%.2f" $PERCENTODEC)
 			fi
 
@@ -560,6 +632,14 @@ if [ -z "$REGIONE" ]; then
 	for REG in "${REGIONI[@]}"; do
 		$MYPATH/covid.sh "$REG"
 	done
+
+	sort -t "." -n -k1,1 -k2,2 "$RTCSVFILE" | while read LINE; do
+		IFS="," read RT REG <<<"$LINE"
+		echo "<tr><td>$REG</td><td>$RT</td></tr>" >>"$RTHTMLFILE"
+	done
+
+	echo "</table></body></html>" >>"$RTHTMLFILE"
+	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 fi
 
 echo "$INDENT""End.......: $(date)" >>"$LOGFILE"
