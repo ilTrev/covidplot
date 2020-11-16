@@ -44,7 +44,7 @@ REGIONI=( \
 	"Valle d'Aosta" \
 	"Veneto" \
 )
-DAYSAMOUNT=90
+DAYSAMOUNT=60
 
 if [ $(cat "$LOGFILE" | wc -l) -gt 1000 ]; then 
 	tail -1000 "$LOGFILE" >/tmp/covid.log
@@ -94,8 +94,10 @@ fi
 if [ -z "$REGIONE" ]; then
 	IMGFILE="$OUTPATH/covid.svg"
 	IMGFILESHORT="$OUTPATH/covidshort.svg"
+	RTIMGFILE="$OUTPATH/rt.svg"
 else
 	IMGFILE="$REGIONEPATH/covid$REGIONEFORMAT.svg"
+	RTIMGFILE="$REGIONEPATH/rt.svg"
 	IMGFILESHORT="$REGIONEPATH/covid$REGIONEFORMAT""short.svg"
 	REGIONEIMGFILE="$REGIONEPATH/covidProvince$REGIONEFORMAT.svg"
 	REGIONEIMGFILESHORT="$REGIONEPATH/covidProvince$REGIONEFORMAT""short.svg"
@@ -155,15 +157,18 @@ set datafile separator ","
 
 unset key
 set xdata time 			
-set timefmt "%Y-%m-%dT%H:%M"
+set timefmt "%Y-%m-%d"
 set format x "%d-%b"
 set key autotitle columnhead
 
+#set xrange ["2020-03-01":*]
+
 set style line 100 lt 1 lc rgb "grey" lw .5
-set grid ls 100 
+set grid y2tics lt 0 lw 0.5 lc rgb "#888888"
+set grid xtics lt 0 lw 0.5 lc rgb "#888888"
 set style line 101 lt 1 lw 2
 
-set terminal svg size 1920,1080 linewidth 1
+set terminal svg size 1600,800 linewidth 1
 set multiplot layout 1,1
 set title font "Arial,20" 
 
@@ -229,11 +234,14 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	TAMPONIIERI=$TAMPONIOGGI
 	TAMPONITOTALIIERI=$TAMPONITOTALI
 
+	LINEDATA=$(cut -f1 -d"T" <<<$LINE)
+	LINE=$(cut -f2- -d"," <<<$LINE | sed "s/.*/$LINEDATA,&/g")
+
 	IFS="," read UNO DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI NOTE <<<"$LINE"
 
 	if [ "$NOTE" != "" ]; then
-		NOTEFIXED=$(echo $NOTE | sed "s/\,//g")
-		LINE=$(echo $LINE | cut -f1-16 -d",")",$NOTEFIXED"
+		NOTEFIXED=$(sed "s/\,//g" <<<$NOTE)
+		LINE=$(cut -f1-16 -d"," <<<$LINE)",$NOTEFIXED"
 	fi
 
 	(( TAMPONIOGGI = TAMPONITOTALI - TAMPONITOTALIIERI ))
@@ -286,8 +294,8 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 		TAMPONIOGGI=0
 		RAPPORTO=0
 	else
-		RAPPORTO=$(echo "$CASI / $TAMPONIOGGI" | /opt/bin/bc -l)
-		if (( $(echo "$RAPPORTO < 0" | /opt/bin/bc -l) )); then
+		RAPPORTO=$(/opt/bin/bc -l <<<"$CASI / $TAMPONIOGGI")
+		if (( $(/opt/bin/bc -l <<< "$RAPPORTO < 0") )); then
 			RAPPORTO=0
 		fi
 	fi
@@ -344,9 +352,11 @@ PERCPOSITIVI=$(echo "$TOTALEPOSITIVI / $POPOLAZIONE * 100" | /opt/bin/bc -l)
 
 RAPPORTOCASITAMPONIIERI=$(printf "%.2f" $(echo "$CASIIERI / $TAMPONIIERI * 100" | /opt/bin/bc -l))
 RAPPORTOCASITAMPONIOGGI=$(printf "%.2f" $(echo "$CASIOGGI / $TAMPONIOGGI * 100" | /opt/bin/bc -l))
+RAPPORTOCASITAMPONI7GG=$(printf "%.2f" $(echo "$MEDIACASI7GG / $MEDIATAMPONI7GG * 100" | /opt/bin/bc -l))
+RAPPORTOCASITAMPONI14GG=$(printf "%.2f" $(echo "$MEDIACASI14GG / $MEDIATAMPONI14GG * 100" | /opt/bin/bc -l))
 
 DATAULTIMOTMP=$(echo $DATIOGGI | cut -f1 -d"," | sed "s/T/ /g" | sed "s/\"//g")
-DATAULTIMO=$(date -d"$DATAULTIMOTMP" +"%d-%m-%Y - %H:%M:%S")
+DATAULTIMO=$(date -d"$DATAULTIMOTMP" +"%d-%m-%Y")
 
 # Rt
 #dimessi guariti
@@ -364,6 +374,16 @@ GAMMAOGGI=$DECESSITOTALI
 (( GAMMA = GAMMAOGGI - GAMMAMENOQUATTRO ))
 RT=$(echo "$BETA / ( $ALPHA + $GAMMA )" | bc -l)
 RT=$(printf "%.2f" $RT)
+
+echo "dati meno quattro: $DATIMENOQUATTRO" >>"$LOGFILE"
+echo "dati oggi: $DATIOGGI" >>"$LOGFILE"
+echo "alpha meno quattro: $ALPHAMENOQUATTRO" >>"$LOGFILE"
+echo "alpha: $ALPHAOGGI" >>"$LOGFILE"
+echo "beta meno quattro: $BETAMENOQUATTRO" >>"$LOGFILE"
+echo "beta: $BETAOGGI" >>"$LOGFILE"
+echo "gamma meno quattro: $GAMMAMENOQUATTRO" >>"$LOGFILE"
+echo "gamma: $GAMMAOGGI" >>"$LOGFILE"
+echo "RT: $RT"
 
 if [ -z "$REGIONE" ]; then
 	cat <<EOF >"$RTHTMLFILE"
@@ -536,7 +556,7 @@ fi
 echo "<table><thead><tr><th></th><th>Ultimo</th><th>Preced.</th><th>Media<br>7gg</th><th>Media<br>14gg</th><th>Max</th></tr></thead>" >>"$HTMLFILE"
 echo "<tbody><tr><td>Tamponi</td><td>$TAMPONIOGGI</td><td>$TAMPONIIERI</td><td>$MEDIATAMPONI7GG</td><td>$MEDIATAMPONI14GG</td><td>$RECORDTAMPONI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Nuovi casi</td><td class="highlight">$CASIOGGI</td><td>$CASIIERI</td><td>$MEDIACASI7GG</td><td>$MEDIACASI14GG</td><td>$RECORDCASI</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>$RAPPORTOCASITAMPONI7GG</td><td>$RAPPORTOCASITAMPONI14GG</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Decessi</td><td class="highlight">$DECESSIOGGI</td><td>$DECESSIIERI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td><td>$RECORDDECESSI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Ricoverati</td><td class="highlight">$RICOVERATI</td><td>$RICOVERATIIERI</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td><td>$RECORDRICOVERATI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Terapie int.<br>(posti: $POSTITERAPIAINTENSIVA)</td><td class="highlight">$TERAPIEINTENSIVE</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
@@ -638,8 +658,24 @@ if [ -z "$REGIONE" ]; then
 		echo "<tr><td>$REG</td><td>$RT</td></tr>" >>"$RTHTMLFILE"
 	done
 
-	echo "</table></body></html>" >>"$RTHTMLFILE"
-	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
+	echo "</table><br>" >>"$RTHTMLFILE"
+	echo "<p><h3>Italia</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/rt.svg\"/></p><br>" >>"$RTHTMLFILE"
+	for REG in "${REGIONI[@]}"; do
+		REGFORMAT=$(echo "$REG" | sed "s/[^[:alnum:]]//g")
+		echo "<p><h3>$REG</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/$REGFORMAT/rt.svg\"/></p><br>" >>"$RTHTMLFILE"
+	done
+	echo "</body></html>" >>"$RTHTMLFILE"
+
+	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
+
+	$MYPATH/rt.sh
+	/opt/bin/gnuplot -e "filename='$OUTPATH/rtItalia.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
+	curl -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
+else
+	$MYPATH/rt.sh "$REGIONE"
+	/opt/bin/gnuplot -e "filename='$REGIONEPATH/rt.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
+	curl -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
 fi
+
 
 echo "$INDENT""End.......: $(date)" >>"$LOGFILE"
