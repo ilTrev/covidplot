@@ -375,14 +375,6 @@ GAMMAOGGI=$DECESSITOTALI
 RT=$(echo "$BETA / ( $ALPHA + $GAMMA )" | bc -l)
 RT=$(printf "%.2f" $RT)
 
-echo "dati meno quattro: $DATIMENOQUATTRO" >>"$LOGFILE"
-echo "dati oggi: $DATIOGGI" >>"$LOGFILE"
-echo "alpha meno quattro: $ALPHAMENOQUATTRO" >>"$LOGFILE"
-echo "alpha: $ALPHAOGGI" >>"$LOGFILE"
-echo "beta meno quattro: $BETAMENOQUATTRO" >>"$LOGFILE"
-echo "beta: $BETAOGGI" >>"$LOGFILE"
-echo "gamma meno quattro: $GAMMAMENOQUATTRO" >>"$LOGFILE"
-echo "gamma: $GAMMAOGGI" >>"$LOGFILE"
 echo "RT: $RT"
 
 if [ -z "$REGIONE" ]; then
@@ -424,6 +416,7 @@ Con:<br><br>
 &beta; = differenza tra individui <i>contagiati</i> all'ultimo rilevamento e quattro giorni prima<br>
 &gamma; = differenza tra individui <i>deceduti</i> all'ultimo rilevamento e quattro giorni prima<br><br>
 EOF
+	echo "<p id=\"inizio\"></p>" >>"$RTHTMLFILE"
 	echo "<b>Rt Nazionale: $RT</b><br>" >>"$RTHTMLFILE"
 	echo "<br><table><thead><tr><td>Regione</td><td>Rt</td></tr></thead>" >>"$RTHTMLFILE"
 	echo >$RTCSVFILE
@@ -550,16 +543,38 @@ if [ ${#NOTA} -gt 1 ];then
 	echo "<p style=\"text-align:center; width: 70%; margin: 0 auto;\"><b>NOTA:</b> $NOTA</p><br>" >>"$HTMLFILE"
 fi
 
+(( DIFFTAMPONI = TAMPONIOGGI - TAMPONIIERI ))
+if [ $DIFFTAMPONI -gt 0 ]; then
+	DIFFTAMPONI="+$DIFFTAMPONI"
+fi
 
+(( DIFFCASI = CASIOGGI - CASIIERI ))
+if [ $DIFFCASI -gt 0 ]; then
+	DIFFCASI="+$DIFFCASI"
+fi
 
+(( DIFFDECESSI = DECESSIOGGI - DECESSIIERI ))
+if [ $DIFFDECESSI -gt 0 ]; then
+	DIFFDECESSI="+$DIFFDECESSI"
+fi
+
+(( DIFFRICOVERATI = RICOVERATI - RICOVERATIIERI ))
+if [ $DIFFRICOVERATI -gt 0 ]; then
+	DIFFRICOVERATI="+$DIFFRICOVERATI"
+fi
+
+(( DIFFTERAPIEINTENSIVE = TERAPIEINTENSIVE - TERAPIEINTENSIVEIERI ))
+if [ $DIFFTERAPIEINTENSIVE -gt 0 ]; then
+	DIFFTERAPIEINTENSIVE="+$DIFFTERAPIEINTENSIVE"
+fi
 
 echo "<table><thead><tr><th></th><th>Ultimo</th><th>Preced.</th><th>Media<br>7gg</th><th>Media<br>14gg</th><th>Max</th></tr></thead>" >>"$HTMLFILE"
-echo "<tbody><tr><td>Tamponi</td><td>$TAMPONIOGGI</td><td>$TAMPONIIERI</td><td>$MEDIATAMPONI7GG</td><td>$MEDIATAMPONI14GG</td><td>$RECORDTAMPONI</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Nuovi casi</td><td class="highlight">$CASIOGGI</td><td>$CASIIERI</td><td>$MEDIACASI7GG</td><td>$MEDIACASI14GG</td><td>$RECORDCASI</td></tr>" >>"$HTMLFILE"
+echo "<tbody><tr><td>Tamponi</td><td>$TAMPONIOGGI<br>($DIFFTAMPONI)</td><td>$TAMPONIIERI</td><td>$MEDIATAMPONI7GG</td><td>$MEDIATAMPONI14GG</td><td>$RECORDTAMPONI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Nuovi casi</td><td><span class="highlight">$CASIOGGI</span><br>($DIFFCASI)</td><td>$CASIIERI</td><td>$MEDIACASI7GG</td><td>$MEDIACASI14GG</td><td>$RECORDCASI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>$RAPPORTOCASITAMPONI7GG</td><td>$RAPPORTOCASITAMPONI14GG</td><td>n/a</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Decessi</td><td class="highlight">$DECESSIOGGI</td><td>$DECESSIIERI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td><td>$RECORDDECESSI</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Ricoverati</td><td class="highlight">$RICOVERATI</td><td>$RICOVERATIIERI</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td><td>$RECORDRICOVERATI</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Terapie int.<br>(posti: $POSTITERAPIAINTENSIVA)</td><td class="highlight">$TERAPIEINTENSIVE</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Decessi</td><td><span class="highlight">$DECESSIOGGI</span><br>($DIFFDECESSI)</td><td>$DECESSIIERI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td><td>$RECORDDECESSI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Ricoverati</td><td><span class="highlight">$RICOVERATI</span><br>($DIFFRICOVERATI)</td><td>$RICOVERATIIERI</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td><td>$RECORDRICOVERATI</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Terapie int.<br>(posti: $POSTITERAPIAINTENSIVA)</td><td><span class="highlight">$TERAPIEINTENSIVE</span><br>($DIFFTERAPIEINTENSIVE)</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>% attualmente<br>positivi<br>($POPOLAZIONE abit.)</td><td>$(printf "%.2f" $PERCPOSITIVI)</td><td>$(printf "%.3f" $PERCPOSITIVIIERI)</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "</tbody></table>" >>"$HTMLFILE"
 
@@ -646,24 +661,26 @@ if [ -z "$FORCED" ]; then
 	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
 fi
 
-
 # esecuzione di tutto il procedimento tra tutte le regioni
 if [ -z "$REGIONE" ]; then
 	for REG in "${REGIONI[@]}"; do
 		$MYPATH/covid.sh "$REG"
 	done
 
-	sort -t "." -n -k1,1 -k2,2 "$RTCSVFILE" | while read LINE; do
+	sort -t "." -n -k1,1 -k2,2 "$RTCSVFILE" | grep -v "^$" | while read LINE; do
 		IFS="," read RT REG <<<"$LINE"
-		echo "<tr><td>$REG</td><td>$RT</td></tr>" >>"$RTHTMLFILE"
+		REGFORMAT=$(echo "$REG" | sed "s/[^[:alnum:]]//g")
+		echo "<tr><td><a href=\"#$REGFORMAT\">$REG</a></td><td>$RT</td><td> - <a href=\"https://www.iltrev.it/covid/$REGFORMAT\">dettaglio</a></td></tr>" >>"$RTHTMLFILE"
 	done
 
 	echo "</table><br>" >>"$RTHTMLFILE"
-	echo "<p><h3>Italia</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/rt.svg\"/></p><br>" >>"$RTHTMLFILE"
+	echo "<p><h3>Italia</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/rt.svg\"/></p>" >>"$RTHTMLFILE"
 	for REG in "${REGIONI[@]}"; do
 		REGFORMAT=$(echo "$REG" | sed "s/[^[:alnum:]]//g")
-		echo "<p><h3>$REG</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/$REGFORMAT/rt.svg\"/></p><br>" >>"$RTHTMLFILE"
+		echo "<p id=\"$REGFORMAT\"><h3>$REG</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/$REGFORMAT/rt.svg\"/></p><a href=\"#inizio\">Torna su</a><br>" >>"$RTHTMLFILE"
 	done
+
+		
 	echo "</body></html>" >>"$RTHTMLFILE"
 
 	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null

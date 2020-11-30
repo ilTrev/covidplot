@@ -19,7 +19,7 @@ RTCSVFILE="$OUTPATH/rtItalia.csv"
 LOGFILE="$OUTPATH/covid.log"
 CREDENTIALS=$(cat $MYPATH/ftpcredentials.credential)
 
-REGIONE=""
+REGIONE="RT"
 
 if [ $# -eq 1 ] && [ "$1" != "-f" ]; then
 	REGIONE="$1"
@@ -54,7 +54,14 @@ for ((i=END;i>=1;i--)); do
 	(( ALPHA = ALPHAZERO - ALPHAMENOQUATTRO ))
 	(( BETA = BETAZERO - BETAMENOQUATTRO ))
 	(( GAMMA = GAMMAZERO - GAMMAMENOQUATTRO ))
-	RT=$(printf "%.2f" $(echo "$BETA / ( $ALPHA + $GAMMA )" | bc -l))
+	
+	(( ALPHAPIUGAMMA = ALPHA + GAMMA ))
 
+	if [ $ALPHAPIUGAMMA = 0 ]; then
+		ALPHAPIUGAMMA="0.1"
+	fi
+	RT=$(printf "%.2f" $(/opt/bin/bc -l <<< "$BETA / $ALPHAPIUGAMMA"))
 	echo "$DATAZERO,$RT" >>"$RTCSVFILE"
+
+#	echo "$DATAZERO - $ALPHAZERO - $BETAZERO - $GAMMAZERO - $DATIZERO"
 done
