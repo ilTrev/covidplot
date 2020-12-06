@@ -4,7 +4,7 @@ set xdata time
 set timefmt "%Y-%m-%dT%H:%M"
 set format x "%d-%b"
 
-set y2range [0:20]
+set y2range [0:10]
 set y2tics mirror 0,1,20
 
 unset key

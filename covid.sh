@@ -209,6 +209,7 @@ MEDIARICOVERATI7GG=0
 MEDIATAMPONI7GG=0
 MEDIATERINT7GG=0
 MEDIAVARIAZIONI=0
+GIORNOOGGI=""
 
 CASI7GG=(0 0 0 0 0 0 0)
 DECESSI7GG=(0 0 0 0 0 0 0)
@@ -237,7 +238,14 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	LINEDATA=$(cut -f1 -d"T" <<<$LINE)
 	LINE=$(cut -f2- -d"," <<<$LINE | sed "s/.*/$LINEDATA,&/g")
 
-	IFS="," read UNO DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI NOTE <<<"$LINE"
+	GIORNOIERI="$GIORNOOGGI"
+
+	IFS="," read GIORNOOGGI DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI NOTE <<<"$LINE"
+
+	if [ "$GIORNOOGGI" = "$GIORNOIERI" ]; then
+		echo "$GIORNOOGGI duplicato!" >>"$LOGFILE"
+		continue
+	fi
 
 	if [ "$NOTE" != "" ]; then
 		NOTEFIXED=$(sed "s/\,//g" <<<$NOTE)
@@ -378,49 +386,6 @@ RT=$(printf "%.2f" $RT)
 echo "RT: $RT"
 
 if [ -z "$REGIONE" ]; then
-	cat <<EOF >"$RTHTMLFILE"
-
-<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta name="robots" content="noindex">
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png">
-<meta name="viewport" content="width=device-width">
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=UA-180932911-1"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'UA-180932911-1');
-</script>
-
-<link href='https://fonts.googleapis.com/css?family=Roboto%20Mono' rel='stylesheet'>
-
-<style>
-body {
-  font-family: 'Roboto Mono';
-  font-size: 10px; 
-}
-</style>
-
-</head>
-<body>
-Valore Rt calcolato secondo il <a href="https://sciencecue.it/coronavirus-come-si-calcola-indice-contagiosita-rt/21898/">modello INFN</a><br>
-(<b><i>NON</i></b> quello ISS, basato su parametri non a nostra disposizione)<br><br>
-Rt = &beta; / ( &alpha; + &gamma; )<br><br>
-Con:<br><br>
-&alpha; = differenza tra individui <i>guariti</i> all'ultimo rilevamento e quattro giorni prima<br>
-&beta; = differenza tra individui <i>contagiati</i> all'ultimo rilevamento e quattro giorni prima<br>
-&gamma; = differenza tra individui <i>deceduti</i> all'ultimo rilevamento e quattro giorni prima<br><br>
-EOF
-	echo "<p id=\"inizio\"></p>" >>"$RTHTMLFILE"
-	echo "<b>Rt Nazionale: $RT</b><br>" >>"$RTHTMLFILE"
-	echo "<br><table><thead><tr><td>Regione</td><td>Rt</td></tr></thead>" >>"$RTHTMLFILE"
-	echo >$RTCSVFILE
-
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covid.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covidshort.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILESHORT" 2>>"$LOGFILE"
 else
@@ -657,12 +622,64 @@ curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
 if [ -z "$FORCED" ]; then
 	echo "Started Telegram post: $(date)" >>"$LOGFILE"
-	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)\nTamponi: $TAMPONIOGGI\nDecessi: $DECESSIOGGI\nRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)\n\nMaggiori informazioni:\nhttps://www.iltrev.it/covid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+
 	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
+
+#else
+	#./redditpost.sh "Aggiornamenti COVID-19 $(date)" "Nuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)Tamponi: $TAMPONIOGGIDecessi: $DECESSIOGGIRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)Maggiori informazioni: https://www.iltrev.it/covid"
 fi
+
+#curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+
 
 # esecuzione di tutto il procedimento tra tutte le regioni
 if [ -z "$REGIONE" ]; then
+
+	cat <<EOF >"$RTHTMLFILE"
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png">
+<meta name="viewport" content="width=device-width">
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-180932911-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-180932911-1');
+</script>
+
+<link href='https://fonts.googleapis.com/css?family=Roboto%20Mono' rel='stylesheet'>
+
+<style>
+body {
+  font-family: 'Roboto Mono';
+  font-size: 10px; 
+}
+</style>
+
+</head>
+<body>
+Valore Rt calcolato secondo il <a href="https://sciencecue.it/coronavirus-come-si-calcola-indice-contagiosita-rt/21898/">modello INFN</a><br>
+(<b><i>NON</i></b> quello ISS, basato su parametri non a nostra disposizione)<br><br>
+Rt = &beta; / ( &alpha; + &gamma; )<br><br>
+Con:<br><br>
+&alpha; = differenza tra individui <i>guariti</i> all'ultimo rilevamento e quattro giorni prima<br>
+&beta; = differenza tra individui <i>contagiati</i> all'ultimo rilevamento e quattro giorni prima<br>
+&gamma; = differenza tra individui <i>deceduti</i> all'ultimo rilevamento e quattro giorni prima<br><br>
+EOF
+	echo "<p id=\"inizio\"></p>" >>"$RTHTMLFILE"
+	echo "<b>Rt Nazionale: $RT</b><br>" >>"$RTHTMLFILE"
+	echo "<br><table><thead><tr><td>Regione</td><td>Rt</td></tr></thead>" >>"$RTHTMLFILE"
+	echo >$RTCSVFILE
+
+
 	for REG in "${REGIONI[@]}"; do
 		$MYPATH/covid.sh "$REG"
 	done
@@ -680,7 +697,6 @@ if [ -z "$REGIONE" ]; then
 		echo "<p id=\"$REGFORMAT\"><h3>$REG</h3><br><img style=\"width:100%\" alt=\"Grafico Rt\" src=\"https://www.iltrev.it/covid/$REGFORMAT/rt.svg\"/></p><a href=\"#inizio\">Torna su</a><br>" >>"$RTHTMLFILE"
 	done
 
-		
 	echo "</body></html>" >>"$RTHTMLFILE"
 
 	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
