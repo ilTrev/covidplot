@@ -10,6 +10,7 @@ PROVINCEFULLCSVFILE="$MYPATH/COVID-19/dati-province/dpc-covid19-ita-province.csv
 LATESTDONEFILE="$OUTPATH/covidLatestDone.txt"
 TMPSINGOLAREGIONEFILE="$OUTPATH/$REGIONEFORMAT/covidLatest.tmp"
 TMPCSVFILE="$MYPATH/COVID-19/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv"
+#TMPCSVFILE="$MYPATH/dpc-covid19-ita-andamento-nazionale.csv"
 CSVFILE="$OUTPATH/covid.csv"
 CSVFILESHORT="$OUTPATH/covidshort.csv"
 HTMLFILE="$OUTPATH/index.html"
@@ -228,7 +229,7 @@ VARIAZIONI14GG=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 LINES=$(wc -l "$TMPCSVFILE" | cut -f1 -d" ")
 ((LINES-=1))
 
-echo "$(head -1 $TMPCSVFILE | sed "s///g"),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
+echo "$(head -1 $TMPCSVFILE | cut -f1-16 -d"," | sed "s///g"),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
 
 tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	CASIIERI=$CASI
@@ -247,10 +248,11 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 		continue
 	fi
 
-	if [ "$NOTE" != "" ]; then
-		NOTEFIXED=$(sed "s/\,//g" <<<$NOTE)
-		LINE=$(cut -f1-16 -d"," <<<$LINE)",$NOTEFIXED"
-	fi
+	# TEMP - if [ "$NOTE" != "" ]; then
+		# TEMP - NOTEFIXED=$(sed "s/\,//g" <<<$NOTE)
+		# TEMP - LINE=$(cut -f1-16 -d"," <<<$LINE)",$NOTEFIXED"
+	# TEMP - fi
+		LINE=$(cut -f1-16 -d"," <<<$LINE)
 
 	(( TAMPONIOGGI = TAMPONITOTALI - TAMPONITOTALIIERI ))
 	(( DECESSIOGGI = DECESSITOTALI - DECESSITOTALIIERI ))
@@ -273,12 +275,16 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	TERINT7GG=("${TERINT7GG[@]:1}")
 	VARIAZIONI7GG=("${VARIAZIONI7GG[@]:1}")
 
+
 	let MEDIACASI7GG=$((${CASI7GG[@]/%/+}0))/7
 	let MEDIADECESSI7GG=$((${DECESSI7GG[@]/%/+}0))/7
 	let MEDIARICOVERATI7GG=$((${RICOVERATI7GG[@]/%/+}0))/7
 	let MEDIATAMPONI7GG=$((${TAMPONI7GG[@]/%/+}0))/7
 	let MEDIATERINT7GG=$((${TERINT7GG[@]/%/+}0))/7
 	let MEDIAVARIAZIONI=$((${VARIAZIONI7GG[@]/%/+}0))/7
+
+	echo "${CASI7GG[@]}" 
+	echo $MEDIACASI7GG
 
 	TERINT14GG=("${TERINT14GG[@]}" "$TERINTOGGI")
 	RICOVERATI14GG=("${RICOVERATI14GG[@]}" "$RICOVERATIOGGI")
@@ -339,7 +345,7 @@ done
 head -1 $CSVFILE >$CSVFILESHORT
 tail -$DAYSAMOUNT $CSVFILE >>$CSVFILESHORT
 
-NOTA=$(tail -1 $TMPCSVFILE | cut -f17- -d"," | sed "s/\"//g")
+# TEMP - NOTA=$(tail -1 $TMPCSVFILE | cut -f17- -d"," | sed "s/\"//g")
 
 DATIMENOQUATTRO=$(tail -5 "$CSVFILE" | head -1)
 DATIALTROIERI=$(tail -3 "$CSVFILE" | head -1)
@@ -349,8 +355,8 @@ DATIOGGI=$(tail -1 "$CSVFILE")
 DECESSITOTALIALTROIERI=$(echo $DATIALTROIERI | cut -f11 -d",")
 TAMPONITOTALIALTROIERI=$(echo $DATIALTROIERI | cut -f15 -d",")
 
-IFS="," read v1 v2 RICOVERATIIERI TERAPIEINTENSIVEIERI v5 v6 TOTALEPOSITIVIIERI v8 CASIIERI v10 DECESSITOTALIIERI v12 v13 v14 TAMPONITOTALIIERI v16 v17 v18 v19 DECESSIIERI RESTO <<<"$DATIIERI"
-IFS="," read v1 v2 RICOVERATI     TERAPIEINTENSIVE v5 v6 TOTALEPOSITIVI v8 CASIOGGI DIMESSIGUARITI DECESSITOTALI v12 v13 TOTALECASI TAMPONITOTALI v16 v17 v18 v19 DECESSIOGGI RECORDTAMPONI RECORDCASI RECORDDECESSI MEDIACASI7GG v25 MEDIADECESSI7GG MEDIATAMPONI7GG MEDIARICOVERATI7GG MEDIATERINT7GG MEDIATERINT14GG MEDIARICOVERATI14GG MEDIADECESSI14GG MEDIATAMPONI14GG MEDIACASI14GG RECORDTERINT RECORDRICOVERATI RESTO <<<"$DATIOGGI"
+IFS="," read v1 v2 RICOVERATIIERI TERAPIEINTENSIVEIERI v5 v6 TOTALEPOSITIVIIERI v8 CASIIERI v10 DECESSITOTALIIERI v12 v13 v14 TAMPONITOTALIIERI v16 v17 v18 DECESSIIERI RESTO <<<"$DATIIERI"
+IFS="," read v1 v2 RICOVERATI     TERAPIEINTENSIVE v5 v6 TOTALEPOSITIVI v8 CASIOGGI DIMESSIGUARITI DECESSITOTALI v12 v13 TOTALECASI TAMPONITOTALI v16 v17 v18 DECESSIOGGI RECORDTAMPONI RECORDCASI RECORDDECESSI MEDIACASI7GG v25 MEDIADECESSI7GG MEDIATAMPONI7GG MEDIARICOVERATI7GG MEDIATERINT7GG MEDIATERINT14GG MEDIARICOVERATI14GG MEDIADECESSI14GG MEDIATAMPONI14GG MEDIACASI14GG RECORDTERINT RECORDRICOVERATI RESTO <<<"$DATIOGGI"
 
 (( TAMPONIIERI = TAMPONITOTALIIERI - TAMPONITOTALIALTROIERI ))
 (( TAMPONIOGGI = TAMPONITOTALI - TAMPONITOTALIIERI ))
@@ -576,19 +582,19 @@ if [ ! -z "$REGIONE" ]; then
 	echo "</table>" >>"$HTMLFILE"
 fi
 
-if [ "$REGIONEWEB" = "Italia" ]; then
-	echo "<br>Note:<br>" >>"$HTMLFILE"
+# TEMP - if [ "$REGIONEWEB" = "Italia" ]; then
+	# TEMP - echo "<br>Note:<br>" >>"$HTMLFILE"
 
-	tail -21 "$REGIONILATESTFILE" | while read RIGA; do
-		NOTA=$(echo "$RIGA" | cut -f21- -d"," | sed '/^[[:space:]]*$/d'  | sed -E 's/[[:space:]]([:,.?!])/\1/g' | sed "s/\"//g")
-		if [ "$NOTA" != "" ];then
-			REGIONENOTA=$(echo "$RIGA" | cut -f4 -d",")
-			echo "<b>$REGIONENOTA</b> - $NOTA<br>" >>"$HTMLFILE"
-		fi
-	done
+	# TEMP - tail -21 "$REGIONILATESTFILE" | while read RIGA; do
+		# TEMP - NOTA=$(echo "$RIGA" | cut -f21- -d"," | sed '/^[[:space:]]*$/d'  | sed -E 's/[[:space:]]([:,.?!])/\1/g' | sed "s/\"//g")
+		# TEMP - if [ "$NOTA" != "" ];then
+			# TEMP - REGIONENOTA=$(echo "$RIGA" | cut -f4 -d",")
+			# TEMP - echo "<b>$REGIONENOTA</b> - $NOTA<br>" >>"$HTMLFILE"
+		# TEMP - fi
+	# TEMP - done
 
-	echo "<br>" >>"$HTMLFILE"
-fi
+	# TEMP - echo "<br>" >>"$HTMLFILE"
+# TEMP - fi
 
 echo "<a href=\"#recenti\">Vai a ultimi $DAYSAMOUNT giorni</a><br>" >>"$HTMLFILE"
 
@@ -680,9 +686,9 @@ EOF
 	echo >$RTCSVFILE
 
 
-	for REG in "${REGIONI[@]}"; do
-		$MYPATH/covid.sh "$REG"
-	done
+	#for REG in "${REGIONI[@]}"; do
+		#$MYPATH/covid.sh "$REG"
+	#done
 
 	sort -t "." -n -k1,1 -k2,2 "$RTCSVFILE" | grep -v "^$" | while read LINE; do
 		IFS="," read RT REG <<<"$LINE"
@@ -701,13 +707,14 @@ EOF
 
 	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
 
-	$MYPATH/rt.sh
-	/opt/bin/gnuplot -e "filename='$OUTPATH/rtItalia.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
-	curl -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
+	# TEMP - $MYPATH/rt.sh
+	# TEMP - /opt/bin/gnuplot -e "filename='$OUTPATH/rtItalia.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
+	# TEMP - curl -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
 else
-	$MYPATH/rt.sh "$REGIONE"
-	/opt/bin/gnuplot -e "filename='$REGIONEPATH/rt.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
-	curl -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
+	echo "regione"
+	# TEMP - $MYPATH/rt.sh "$REGIONE"
+	# TEMP - /opt/bin/gnuplot -e "filename='$REGIONEPATH/rt.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
+	# TEMP - curl -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
 fi
 
 

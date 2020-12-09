@@ -26,8 +26,8 @@ set title "Tamponi"
 set ylabel "Tamponi giorno"
 set y2label "Positivi/Tamponi"
 set y2range [0:1]
-plot filename using 1:19 with linespoints linestyle 1 title columnhead at end, \
-           "" using 1:18 with linespoints linestyle 2 axis x1y2 title columnhead at end
+plot filename using 1:18 with linespoints linestyle 1 title columnhead at end, \
+           "" using 1:17 with linespoints linestyle 2 axis x1y2 title columnhead at end
 set y2range [*:*]
 
 set title "Casi positivi"
@@ -35,8 +35,8 @@ set ylabel "Nuovi positivi / variazione totale"
 set y2label "Totale positivi"
 set key title "N.B.: il totale positivi e la variazione totale positivi sono la differenza tra nuovi casi e decessi/guariti" top left 
 
-plot "" using 1:25 with linespoints linestyle 1 linecolor "#ff6633" title columnhead at end, \
-     "" using 1:24 with linespoints linestyle 2 linecolor "#33bb44" title columnhead at end, \
+plot "" using 1:24 with linespoints linestyle 1 linecolor "#ff6633" title columnhead at end, \
+     "" using 1:23 with linespoints linestyle 2 linecolor "#33bb44" title columnhead at end, \
      "" using 1:7  with linespoints linestyle 3 linecolor "#6633ff" axis x1y2 title columnhead at end
 
 unset key
@@ -45,7 +45,7 @@ set y2tics
 set ylabel "Totale deceduti"
 set y2label "Deceduti giorno"
 plot "" using 1:11 with linespoints linestyle 1 title columnhead at end, \
-     "" using 1:26 with linespoints linestyle 2 axis x1y2 title columnhead at end
+     "" using 1:25 with linespoints linestyle 2 axis x1y2 title columnhead at end
 
 set title "Ricoverati"
 set ylabel "Ricoverati - terapie intensive"
