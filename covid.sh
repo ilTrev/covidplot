@@ -630,7 +630,7 @@ if [ -z "$FORCED" ]; then
 	#./redditpost.sh "Aggiornamenti COVID-19 $(date)" "Nuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)Tamponi: $TAMPONIOGGIDecessi: $DECESSIOGGIRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)Maggiori informazioni: https://www.iltrev.it/covid"
 fi
 
-#curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
 
 
 # esecuzione di tutto il procedimento tra tutte le regioni
