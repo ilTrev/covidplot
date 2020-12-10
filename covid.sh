@@ -283,9 +283,6 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	let MEDIATERINT7GG=$((${TERINT7GG[@]/%/+}0))/7
 	let MEDIAVARIAZIONI=$((${VARIAZIONI7GG[@]/%/+}0))/7
 
-	echo "${CASI7GG[@]}" 
-	echo $MEDIACASI7GG
-
 	TERINT14GG=("${TERINT14GG[@]}" "$TERINTOGGI")
 	RICOVERATI14GG=("${RICOVERATI14GG[@]}" "$RICOVERATIOGGI")
 	TAMPONI14GG=("${TAMPONI14GG[@]}" "$TAMPONIOGGI")
@@ -628,7 +625,7 @@ curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
 if [ -z "$FORCED" ]; then
 	echo "Started Telegram post: $(date)" >>"$LOGFILE"
-	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
 
 	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
 
@@ -636,7 +633,7 @@ if [ -z "$FORCED" ]; then
 	#./redditpost.sh "Aggiornamenti COVID-19 $(date)" "Nuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)Tamponi: $TAMPONIOGGIDecessi: $DECESSIOGGIRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)Maggiori informazioni: https://www.iltrev.it/covid"
 fi
 
-curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
 
 
 # esecuzione di tutto il procedimento tra tutte le regioni
@@ -686,9 +683,9 @@ EOF
 	echo >$RTCSVFILE
 
 
-	#for REG in "${REGIONI[@]}"; do
-		#$MYPATH/covid.sh "$REG"
-	#done
+	for REG in "${REGIONI[@]}"; do
+		$MYPATH/covid.sh "$REG"
+	done
 
 	sort -t "." -n -k1,1 -k2,2 "$RTCSVFILE" | grep -v "^$" | while read LINE; do
 		IFS="," read RT REG <<<"$LINE"
@@ -707,14 +704,14 @@ EOF
 
 	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
 
-	# TEMP - $MYPATH/rt.sh
-	# TEMP - /opt/bin/gnuplot -e "filename='$OUTPATH/rtItalia.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
-	# TEMP - curl -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
+	$MYPATH/rt.sh
+	/opt/bin/gnuplot -e "filename='$OUTPATH/rtItalia.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
+	curl -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
 else
 	echo "regione"
-	# TEMP - $MYPATH/rt.sh "$REGIONE"
-	# TEMP - /opt/bin/gnuplot -e "filename='$REGIONEPATH/rt.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
-	# TEMP - curl -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
+	$MYPATH/rt.sh "$REGIONE"
+	/opt/bin/gnuplot -e "filename='$REGIONEPATH/rt.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
+	curl -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
 fi
 
 
