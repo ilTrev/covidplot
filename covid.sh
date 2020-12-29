@@ -116,6 +116,7 @@ if [ -z "$FORCED" ] && [ "$LATESTDONE" = "$TODAY" ]; then
 fi
 
 cd "$MYPATH/COVID-19"
+/opt/bin/git reset --hard >>"$LOGFILE" 2>&1
 /opt/bin/git fetch >"$MYPATH/out/git.log" 2>&1
 if [ $(wc -l "$MYPATH/out/git.log" | cut -f1 -d" ") -gt 0 ]; then
 	/opt/bin/git pull >>"$LOGFILE" 2>&1
@@ -228,7 +229,6 @@ VARIAZIONI14GG=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 
 LINES=$(wc -l "$TMPCSVFILE" | cut -f1 -d" ")
 ((LINES-=1))
-
 echo "$(head -1 $TMPCSVFILE | cut -f1-16 -d"," | sed "s///g"),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
 
 tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
@@ -383,7 +383,7 @@ GAMMAOGGI=$DECESSITOTALI
 (( ALPHA = ALPHAOGGI - ALPHAMENOQUATTRO ))
 (( BETA = BETAOGGI - BETAMENOQUATTRO ))
 (( GAMMA = GAMMAOGGI - GAMMAMENOQUATTRO ))
-RT=$(echo "$BETA / ( $ALPHA + $GAMMA )" | bc -l)
+RT=$(echo "$BETA / ( $ALPHA + $GAMMA )" | /opt/bin/bc -l)
 RT=$(printf "%.2f" $RT)
 
 echo "RT: $RT"
@@ -425,8 +425,14 @@ cat <<EOF >"$HTMLFILE"
 <html lang="it">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png">
-<meta name="viewport" content="width=device-width">
+<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/8/82/SARS-CoV-2_without_background.png" />
+<meta property="og:image:alt" content="SARS-CoV-2 in 3d" />
+<meta property="og:url" content="https://www.iltrev.it/covid/index.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="COVID-19 Italia" />
+<meta property="og:description" content="Dati COVID-19 dal Dipartimento di Protezione Civile. Aggiornati ogni giorno, intorno alle 17." /> 
+
+<meta name="viewport" content="width=device-width" />
 <!-- Global site tag (gtag.js) - Google Analytics -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=UA-180932911-1"></script>
 <script>
@@ -552,19 +558,17 @@ if [ ! -z "$REGIONE" ]; then
 
 	TOTALECASIREGIONE=$(tail -1 "$CSVFILE" | cut -f14 -d",")
 	echo "<table><thead><tr><th colspan=\"3\"><b>$TOTALECASIREGIONE</b> casi da inizio pandemia, di cui:</th></tr>" >>"$HTMLFILE"
-	echo "<tr><th><b>Provincia</b></th><th><b>Casi</b></th><th><b>% abitanti<br>(totali)</b></th></tr></thead>" >>"$HTMLFILE"
+	echo "<tr><th><b>Provincia</b></th><th><b>Casi</b></th><th><b>% abitanti</b></th></tr></thead>" >>"$HTMLFILE"
 
-	cat $PROVINCEREGIONECSVFILE | cut -f6 -d"," | sed "s/Fuori Regione \/ Provincia Autonoma/_&/g" | sed "s/In fase di definizione\/aggiornamento/_&/g" | sort | while read PROVINCIA; do
+	cat $PROVINCEREGIONECSVFILE | grep -v "Fuori" | grep -v "definizione" | cut -f6 -d"," |  sort | while read PROVINCIA; do
 		PROVINCIA=$(echo "$PROVINCIA" | sed "s/_//g")
-		TOTALECASIPROVINCIA=$(grep "$PROVINCIA" "$PROVINCEREGIONECSVFILE" | cut -f10 -d",")
+		TOTALECASIPROVINCIA=$(grep ",$PROVINCIA," "$PROVINCEREGIONECSVFILE" | cut -f10 -d",")
 		if [ "$TOTALECASIPROVINCIA" != "0" ]; then
 			PERCENTO="n/a"
 
 			if [ "$PROVINCIA" = "Fuori Regione / Provincia Autonoma" ]; then
-				ABITANTIPROVINCIA=""
 				PROVINCIA="Fuori regione"
 			elif [ "$PROVINCIA" = "In fase di definizione/aggiornamento" ]; then
-				ABITANTIPROVINCIA=""
 				PROVINCIA="In aggiornamento"
 			else
 				ABITANTIPROVINCIA=$(grep "$PROVINCIA" "$MYPATH/province.csv" | cut -f2 -d",")
@@ -572,7 +576,7 @@ if [ ! -z "$REGIONE" ]; then
 				PERCENTO=$(printf "%.2f" $PERCENTODEC)
 			fi
 
-			echo "<tr><td>$PROVINCIA</td><td><b>$TOTALECASIPROVINCIA</b></td><td>$PERCENTO<br>$ABITANTIPROVINCIA</td></tr>" >>"$HTMLFILE"
+			echo "<tr><td>$PROVINCIA</td><td><b>$TOTALECASIPROVINCIA</b></td><td>$PERCENTO</td></tr>" >>"$HTMLFILE"
 		fi
 	done
 
@@ -678,9 +682,13 @@ Con:<br><br>
 &gamma; = differenza tra individui <i>deceduti</i> all'ultimo rilevamento e quattro giorni prima<br><br>
 EOF
 	echo "<p id=\"inizio\"></p>" >>"$RTHTMLFILE"
-	echo "<b>Rt Nazionale: $RT</b><br>" >>"$RTHTMLFILE"
+	echo "<b>Rt Nazionale:</b> $BETA / ( $ALPHA + $GAMMA ) = <b>$RT</b><br>" >>"$RTHTMLFILE"
 	echo "<br><table><thead><tr><td>Regione</td><td>Rt</td></tr></thead>" >>"$RTHTMLFILE"
 	echo >$RTCSVFILE
+
+
+
+
 
 
 	for REG in "${REGIONI[@]}"; do

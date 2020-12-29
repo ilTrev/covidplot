@@ -3,6 +3,8 @@ set datafile separator ","
 set xdata time 			
 set timefmt "%Y-%m-%d"
 set format x "%d-%b"
+set format y2 "%.0f"
+set format y "%.0f"
 
 unset key
 set style line 100 lt 1 lc rgb "grey" lw .5
@@ -29,6 +31,7 @@ set y2range [0:1]
 plot filename using 1:18 with linespoints linestyle 1 title columnhead at end, \
            "" using 1:17 with linespoints linestyle 2 axis x1y2 title columnhead at end
 set y2range [*:*]
+set yrange [*:*]
 
 set title "Casi positivi"
 set ylabel "Nuovi positivi / variazione totale"
