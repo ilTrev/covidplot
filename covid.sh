@@ -229,7 +229,7 @@ VARIAZIONI14GG=(0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 
 LINES=$(wc -l "$TMPCSVFILE" | cut -f1 -d" ")
 ((LINES-=1))
-echo "$(head -1 $TMPCSVFILE | cut -f1-16 -d"," | sed "s///g"),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\"" | sed "s/_/ /g" >"$CSVFILE"
+echo "$(head -1 $TMPCSVFILE | cut -f1-16 -d"," | sed "s///g"),\"positivi/tamponi\",\"tamponi giorno\",\"deceduti giorno\",\"record tamponi\",\"record casi\",\"record decessi\",\"media nuovi casi 7gg\",\"variazione media 7gg\",\"media deceduti 7gg\",\"media tamponi 7gg\",\"media ricoverati 7gg\",\"media ter. int. 7gg\",\"media ter. int. 14gg\",\"media ricoverati 14gg\",\"media decessi 14gg\",\"media tamponi 14gg\",\"media nuovi casi 14gg\",\"max terapie int.\",\"max. ricoverati\",\"ingressi t.i.\"" | sed "s/_/ /g" >"$CSVFILE"
 
 tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	CASIIERI=$CASI
@@ -241,7 +241,11 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 
 	GIORNOIERI="$GIORNOOGGI"
 
-	IFS="," read GIORNOOGGI DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI NOTE <<<"$LINE"
+	IFS="," read GIORNOOGGI DUE RICOVERATIOGGI TERINTOGGI CINQUE SEI SETTE VARIAZIONE CASI DIECI DECESSITOTALI DODICI TREDICI QUATTORDICI TAMPONITOTALI SEDICI NOTE INGRESSITI RESTO <<<"$LINE"
+
+	[ "$INGRESSITI" -eq "$INGRESSITI" ] 2>/dev/null; if [ $? -ne 0 ]; then 
+		INGRESSITI=0
+	fi
 
 	if [ "$GIORNOOGGI" = "$GIORNOIERI" ]; then
 		echo "$GIORNOOGGI duplicato!" >>"$LOGFILE"
@@ -332,7 +336,7 @@ tail -$LINES "$TMPCSVFILE" | sed "s///g" | while read LINE; do
 	if (( RICOVERATIOGGI > RECORDRICOVERATI )); then
 		RECORDRICOVERATI=$RICOVERATIOGGI
 	fi
-	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI7GG,$MEDIAVARIAZIONI,$MEDIADECESSI7GG,$MEDIATAMPONI7GG,$MEDIARICOVERATI7GG,$MEDIATERINT7GG,$MEDIATERINT14GG,$MEDIARICOVERATI14GG,$MEDIADECESSI14GG,$MEDIATAMPONI14GG,$MEDIACASI14GG,$RECORDTERINT,$RECORDRICOVERATI" >>"$CSVFILE" 
+	echo "$LINE,$RAPPORTO,$TAMPONIOGGI,$DECESSIOGGI,$RECORDTAMPONI,$RECORDCASI,$RECORDDECESSI,$MEDIACASI7GG,$MEDIAVARIAZIONI,$MEDIADECESSI7GG,$MEDIATAMPONI7GG,$MEDIARICOVERATI7GG,$MEDIATERINT7GG,$MEDIATERINT14GG,$MEDIARICOVERATI14GG,$MEDIADECESSI14GG,$MEDIATAMPONI14GG,$MEDIACASI14GG,$RECORDTERINT,$RECORDRICOVERATI,$INGRESSITI" >>"$CSVFILE" 
 
 	DECESSITOTALIIERI=$DECESSITOTALI
 
@@ -352,8 +356,8 @@ DATIOGGI=$(tail -1 "$CSVFILE")
 DECESSITOTALIALTROIERI=$(echo $DATIALTROIERI | cut -f11 -d",")
 TAMPONITOTALIALTROIERI=$(echo $DATIALTROIERI | cut -f15 -d",")
 
-IFS="," read v1 v2 RICOVERATIIERI TERAPIEINTENSIVEIERI v5 v6 TOTALEPOSITIVIIERI v8 CASIIERI v10 DECESSITOTALIIERI v12 v13 v14 TAMPONITOTALIIERI v16 v17 v18 DECESSIIERI RESTO <<<"$DATIIERI"
-IFS="," read v1 v2 RICOVERATI     TERAPIEINTENSIVE v5 v6 TOTALEPOSITIVI v8 CASIOGGI DIMESSIGUARITI DECESSITOTALI v12 v13 TOTALECASI TAMPONITOTALI v16 v17 v18 DECESSIOGGI RECORDTAMPONI RECORDCASI RECORDDECESSI MEDIACASI7GG v25 MEDIADECESSI7GG MEDIATAMPONI7GG MEDIARICOVERATI7GG MEDIATERINT7GG MEDIATERINT14GG MEDIARICOVERATI14GG MEDIADECESSI14GG MEDIATAMPONI14GG MEDIACASI14GG RECORDTERINT RECORDRICOVERATI RESTO <<<"$DATIOGGI"
+IFS="," read v1 v2 RICOVERATIIERI TERAPIEINTENSIVEIERI v5 v6 TOTALEPOSITIVIIERI v8 CASIIERI v10 DECESSITOTALIIERI v12 v13 v14 TAMPONITOTALIIERI v16 v17 v18 DECESSIIERI v20 v21 v22 v23 v24 v25 v26 v27 v28 v29 v30 v31 v32 v33 v34 v35 INGRESSITIIERI RESTO <<<"$DATIIERI"
+IFS="," read v1 v2 RICOVERATI     TERAPIEINTENSIVE v5 v6 TOTALEPOSITIVI v8 CASIOGGI DIMESSIGUARITI DECESSITOTALI v12 v13 TOTALECASI TAMPONITOTALI v16 v17 v18 DECESSIOGGI RECORDTAMPONI RECORDCASI RECORDDECESSI MEDIACASI7GG v25 MEDIADECESSI7GG MEDIATAMPONI7GG MEDIARICOVERATI7GG MEDIATERINT7GG MEDIATERINT14GG MEDIARICOVERATI14GG MEDIADECESSI14GG MEDIATAMPONI14GG MEDIACASI14GG RECORDTERINT RECORDRICOVERATI INGRESSITIOGGI RESTO <<<"$DATIOGGI"
 
 (( TAMPONIIERI = TAMPONITOTALIIERI - TAMPONITOTALIALTROIERI ))
 (( TAMPONIOGGI = TAMPONITOTALI - TAMPONITOTALIIERI ))
@@ -548,7 +552,7 @@ echo "<tr><td>Nuovi casi</td><td><span class="highlight">$CASIOGGI</span><br>($D
 echo "<tr><td>%posit./tamp.</td><td>$RAPPORTOCASITAMPONIOGGI</td><td>$RAPPORTOCASITAMPONIIERI</td><td>$RAPPORTOCASITAMPONI7GG</td><td>$RAPPORTOCASITAMPONI14GG</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Decessi</td><td><span class="highlight">$DECESSIOGGI</span><br>($DIFFDECESSI)</td><td>$DECESSIIERI</td><td>$MEDIADECESSI7GG</td><td>$MEDIADECESSI14GG</td><td>$RECORDDECESSI</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>Ricoverati</td><td><span class="highlight">$RICOVERATI</span><br>($DIFFRICOVERATI)</td><td>$RICOVERATIIERI</td><td>$MEDIARICOVERATI7GG</td><td>$MEDIARICOVERATI14GG</td><td>$RECORDRICOVERATI</td></tr>" >>"$HTMLFILE"
-echo "<tr><td>Terapie int.<br>(posti: $POSTITERAPIAINTENSIVA)</td><td><span class="highlight">$TERAPIEINTENSIVE</span><br>($DIFFTERAPIEINTENSIVE)</td><td>$TERAPIEINTENSIVEIERI</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
+echo "<tr><td>Terapie int.<br>(nuovi ingressi)<br>(posti: $POSTITERAPIAINTENSIVA)</td><td><span class="highlight">$TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)</span><br>($INGRESSITIOGGI)</td><td>$TERAPIEINTENSIVEIERI<br>($INGRESSITIIERI)</td><td>$MEDIATERINT7GG</td><td>$MEDIATERINT14GG</td><td>$RECORDTERINT</td></tr>" >>"$HTMLFILE"
 echo "<tr><td>% attualmente<br>positivi<br>($POPOLAZIONE abit.)</td><td>$(printf "%.2f" $PERCPOSITIVI)</td><td>$(printf "%.3f" $PERCPOSITIVIIERI)</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>" >>"$HTMLFILE"
 echo "</tbody></table>" >>"$HTMLFILE"
 
@@ -629,7 +633,7 @@ curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
 if [ -z "$FORCED" ]; then
 	echo "Started Telegram post: $(date)" >>"$LOGFILE"
-	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE - ingressi: $INGRESSITIOGGI)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
 
 	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
 
@@ -637,7 +641,7 @@ if [ -z "$FORCED" ]; then
 	#./redditpost.sh "Aggiornamenti COVID-19 $(date)" "Nuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)Tamponi: $TAMPONIOGGIDecessi: $DECESSIOGGIRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)Maggiori informazioni: https://www.iltrev.it/covid"
 fi
 
-curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE - ingressi: $INGRESSITIOGGI)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
 
 
 # esecuzione di tutto il procedimento tra tutte le regioni

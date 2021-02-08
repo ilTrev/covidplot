@@ -51,11 +51,12 @@ plot "" using 1:11 with linespoints linestyle 1 title columnhead at end, \
      "" using 1:25 with linespoints linestyle 2 axis x1y2 title columnhead at end
 
 set title "Ricoverati"
-set ylabel "Ricoverati - terapie intensive"
+set ylabel "Ricoverati, terapie intensive, isolamento domiciliare / 10"
 set y2label "Dimessi - guariti"
 plot "" using 1:3 with linespoints linestyle 1 title columnhead at end, \
      "" using 1:4 with linespoints linestyle 4 title columnhead at end, \
      "" using 1:5 with linespoints linestyle 3 title columnhead at end, \
+     "" using 1:($6/10) with linespoints linestyle 3 title columnhead at end, \
      "" using 1:10 with linespoints linestyle 2 axis x1y2 title columnhead at end
 
 unset multiplot
