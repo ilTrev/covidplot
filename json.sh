@@ -2,8 +2,8 @@
 OUTFILE="out/covidtmp.csv"
 RIGA=0
 
-FILENAZIONALE="./COVID-19/dati-json/dpc-covid19-ita-andamento-nazionale.json"
-TOTRIGHENAZIONALE=$(jq length $FILENAZIONALE)
+FILE="./COVID-19/dati-json/dpc-covid19-ita-andamento-nazionale.json"
+TOTRIGHE=$(jq length $FILE)
 
 echo "data,stato,ricoverati_con_sintomi,terapia_intensiva,totale_ospedalizzati,isolamento_domiciliare,totale_positivi,variazione_totale_positivi,nuovi_positivi,dimessi_guariti,deceduti,casi_da_sospetto_diagnostico,casi_da_screening,totale_casi,tamponi,casi_testati,note,ingressi_terapia_intensiva,note_test,note_casi" >./out/coviddajson.csv
 
