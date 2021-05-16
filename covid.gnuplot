@@ -40,7 +40,8 @@ set key title "N.B.: il totale positivi e la variazione totale positivi sono la 
 
 plot "" using 1:24 with linespoints linestyle 1 linecolor "#ff6633" title columnhead at end, \
      "" using 1:23 with linespoints linestyle 2 linecolor "#33bb44" title columnhead at end, \
-     "" using 1:7  with linespoints linestyle 3 linecolor "#6633ff" axis x1y2 title columnhead at end
+     "" using 1:7  with linespoints linestyle 3 linecolor "#6633ff" axis x1y2 title columnhead at end 
+     # media nuovi casi 14gg "" using 1:33 with linespoints linestyle 4 linecolor "#000000" title columnhead at end, \
 
 unset key
 set title "Deceduti"

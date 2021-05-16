@@ -1,5 +1,26 @@
 #!/bin/sh
 
+curl_send() {
+	echo "$(date) curl -m 10 $@"
+	curl -m 10 $@
+	if [ $? -ne 0 ]; then
+		echo "$(date) RETRY 1 curl -m 10 $@" >>$LOGFILE
+		curl -m 10 $@
+		if [ $? -ne 0 ]; then
+			echo "$(date) RETRY 2 curl -m 10 $@" >>$LOGFILE
+			curl -m 10 $@
+			if [ $? -ne 0 ]; then
+				echo "$(date) RETRY 3 curl -m 10 $@" >>$LOGFILE
+				curl -m 10 $@
+				if [ $? -ne 0 ]; then
+					echo "$(date) FALLITO! curl -m 10 $@" >>$LOGFILE
+				fi	
+			fi
+		fi
+	fi
+}
+
+MAXLOGLINES=5000
 MYPATH="/share/Public/bin/covid"
 OUTPATH="$MYPATH/out"
 LATESTFILE="$MYPATH/COVID-19/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale-latest.csv"
@@ -47,8 +68,8 @@ REGIONI=( \
 )
 DAYSAMOUNT=60
 
-if [ $(cat "$LOGFILE" | wc -l) -gt 1000 ]; then 
-	tail -1000 "$LOGFILE" >/tmp/covid.log
+if [ $(cat "$LOGFILE" | wc -l) -gt $MAXLOGLINES ]; then 
+	tail -$MAXLOGLINES "$LOGFILE" >/tmp/covid.log
 	mv /tmp/covid.log "$LOGFILE"
 fi
 
@@ -136,7 +157,7 @@ if [ "$LATESTDONE" != "$LATESTDOWNLOAD" ] && [ "$TODAY" = "$LATESTDOWNLOAD" ]; t
 	echo "Update found!" >>"$LOGFILE"
 else
 	if [ -z "$FORCED" ]; then
-		curl -T "$HTMLFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+		curl_send -T "$HTMLFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 		echo "$INDENT""End (NoOp): $(date)" >>"$LOGFILE"
 		exit
 	fi
@@ -170,12 +191,12 @@ set grid y2tics lt 0 lw 0.5 lc rgb "#888888"
 set grid xtics lt 0 lw 0.5 lc rgb "#888888"
 set style line 101 lt 1 lw 2
 
-set terminal svg size 1600,800 linewidth 1
+set terminal svg size 1600,1000 linewidth 1
 set multiplot layout 1,1
 set title font "Arial,20" 
 
 set title "Province"
-set y2label "Casi totali"
+set y2label "% Casi totali"
 set y2tics
 unset ytics
 
@@ -184,13 +205,22 @@ EOF
 	PLOT="plot "
 	cat $PROVINCEREGIONECSVFILE | grep -v "definizione" | grep -v "Fuori Regione" | while read RIGAPROVINCIA; do
 		PROVINCIA=$(echo "$RIGAPROVINCIA" | cut -f6 -d"," | sed "s/\/.*//g")
+		ABITANTIPROVINCIA=$(cat $MYPATH/province.csv | grep "$PROVINCIA" | cut -f2 -d",")
+
 		head -1 $PROVINCEREGIONEFULLCSVFILE | sed "s/totale_casi/$PROVINCIA/g" >"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
-		cat "$PROVINCEREGIONEFULLCSVFILE" | grep ",$PROVINCIA," >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
+
+		echo $PROVINCIA 
+		cat "$PROVINCEREGIONEFULLCSVFILE" | grep ",$PROVINCIA," | while read LINE; do
+			POSITIVI=$(echo $LINE | cut -f10 -d",")
+			PERCENTO=$(/opt/bin/bc -l <<<"$POSITIVI / $ABITANTIPROVINCIA * 100")
+			echo "$LINE,$PERCENTO" >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv"
+		done
+
 
 		head -1 "$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv" >"$REGIONEPATH/province/covid$REGIONE$PROVINCIA""short"
 		tail -$DAYSAMOUNT "$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv" >>"$REGIONEPATH/province/covid$REGIONE$PROVINCIA""short"
 
-		echo "$PLOT\"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv\" using 1:10 with linespoints pointtype 7 pointsize 0.25 axis x1y2 title \"$PROVINCIA\" at end, \\" >>"$REGIONEPATH/covidProvince.gnuplot"
+		echo "$PLOT\"$REGIONEPATH/province/covid$REGIONE$PROVINCIA.csv\" using 1:15 with linespoints pointtype 7 pointsize 0.25 axis x1y2 title \"$PROVINCIA\" at end, \\" >>"$REGIONEPATH/covidProvince.gnuplot"
 
 		PLOT=""
 	done
@@ -396,7 +426,6 @@ if [ -z "$REGIONE" ]; then
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covid.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILE" 2>>"$LOGFILE"
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/covidshort.csv'" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILESHORT" 2>>"$LOGFILE"
 else
-
 	echo "$RT,$REGIONE" >>$RTCSVFILE
 
 	GNUPLOTCSVFILE="$REGIONEFORMAT""/covid.csv"
@@ -405,18 +434,18 @@ else
 	/opt/bin/gnuplot -e "filename='/share/Public/bin/covid/out/$GNUPLOTCSVFILE" /share/Public/bin/covid/covid.gnuplot  >"$IMGFILESHORT" 2>>"$LOGFILE"
 
 	/opt/bin/gnuplot "$REGIONEPATH/covidProvince.gnuplot" >"$REGIONEIMGFILE" 2>>"$LOGFILE"
-	curl -T "$REGIONEIMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+	curl_send -T "$REGIONEIMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 
 	ls "$REGIONEPATH/province/"*short | while read FILE; do
 		NEWFILE=$(echo $FILE | sed "s/short$//g")
 		mv "$FILE" "$NEWFILE.csv"
 	done
 	/opt/bin/gnuplot "$REGIONEPATH/covidProvince.gnuplot" >"$REGIONEIMGFILESHORT" 2>>"$LOGFILE"
-	curl -T "$REGIONEIMGFILESHORT" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+	curl_send -T "$REGIONEIMGFILESHORT" -u "$CREDENTIALS" "ftp://iltrev.it/" 
 fi
 
-curl -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
-curl -T "$IMGFILESHORT" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+curl_send -T "$IMGFILE" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
+curl_send -T "$IMGFILESHORT" -u "$CREDENTIALS" "ftp://iltrev.it/" 2>/dev/null
 
 if [ ! -z "$REGIONE" ]; then
 	REGIONEWEB="$REGIONE"
@@ -629,19 +658,16 @@ if [ ! -z "$REGIONE" ]; then
 	WEBPATH="$WEBPATH$REGIONEFORMAT/"
 fi
 
-curl -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
+curl_send -T $HTMLFILE -u $CREDENTIALS $WEBPATH  2>/dev/null
 
 if [ -z "$FORCED" ]; then
 	echo "Started Telegram post: $(date)" >>"$LOGFILE"
-	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE - ingressi: $INGRESSITIOGGI)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+	curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@instantcovid\", \"text\": \"Aggiornamento COVID-19\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE - ingressi: $INGRESSITIOGGI)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
 
 	echo "Done Telegram post..: $(date)" >>"$LOGFILE"
-
-#else
-	#./redditpost.sh "Aggiornamenti COVID-19 $(date)" "Nuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI%)Tamponi: $TAMPONIOGGIDecessi: $DECESSIOGGIRicoverati: $RICOVERATI ($TERAPIEINTENSIVE t.i.)Maggiori informazioni: https://www.iltrev.it/covid"
 fi
 
-curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE - ingressi: $INGRESSITIOGGI)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage 2>&1 | tee -a "$LOGFILE"
+curl -X POST -H 'Content-Type: application/json' -d "{ \"disable_web_page_preview\": \"true\", \"chat_id\": \"@mycovidtest\", \"text\": \"Aggiornamento COVID-19 $REGIONE\nTamponi: $TAMPONIOGGI ($DIFFTAMPONI)\nNuovi Casi: $CASIOGGI ($RAPPORTOCASITAMPONIOGGI% - $DIFFCASI)\nDecessi: $DECESSIOGGI ($DIFFDECESSI)\nRicoverati: $RICOVERATI ($DIFFRICOVERATI)\nTerapie int.: $TERAPIEINTENSIVE ($DIFFTERAPIEINTENSIVE - ingressi: $INGRESSITIOGGI)\n\nDati completi: https://bit.ly/instantcovid\" }" https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage
 
 
 # esecuzione di tutto il procedimento tra tutte le regioni
@@ -714,16 +740,16 @@ EOF
 
 	echo "</body></html>" >>"$RTHTMLFILE"
 
-	curl -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
+	curl_send -T $RTHTMLFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
 
 	$MYPATH/rt.sh
 	/opt/bin/gnuplot -e "filename='$OUTPATH/rtItalia.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
-	curl -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
+	curl_send -T $RTIMGFILE -u $CREDENTIALS $WEBPATH 2>/dev/null
 else
 	echo "regione"
 	$MYPATH/rt.sh "$REGIONE"
 	/opt/bin/gnuplot -e "filename='$REGIONEPATH/rt.csv'" $MYPATH/rt.gnuplot >"$RTIMGFILE" 2>/dev/null
-	curl -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
+	curl_send -T "$RTIMGFILE" -u $CREDENTIALS $WEBPATH 2>/dev/null
 fi
 
 
